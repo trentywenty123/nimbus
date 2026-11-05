@@ -887,7 +887,7 @@ function login(msg, soft){
       <div class="row"><span><i class="check" id="chk"></i>Keep me signed in</span><span class="link" id="forgot">Forgot password?</span></div>
       <button class="btn" id="go">Sign in</button>
       <div class="split">or</div>
-      <div class="sso"><button class="btn ghost sso-btn">Continue with Google</button><button class="btn ghost sso-btn">Continue with Apple</button></div>
+      <div class="sso"><button class="btn ghost sso-btn">Continue with Cloud ID</button><button class="btn ghost sso-btn">Continue with Passkey</button></div>
     </div>
     <div class="activity"><span>Last sign-in: ${state.attempt ? "a moment ago, briefly" : "never (welcome!)"}</span><span>Devices: ${state.attempt ? state.attempt + 4 : 1}</span></div>
     <p class="gamenote">NIMBUS is a horror game. Nothing here is real — don't type a real password, name or card. Headphones recommended.</p>
@@ -1953,8 +1953,8 @@ async function returnHome(n){
     last:    ["Last sign-in: never (welcome!)", `Last sign-in: ${DREAD.hour()}, from behind you`, "Last sign-in: now", "Last sign-in: now, from your chair"][n],
     devices: ["Devices: 1", "Devices: 2", "Devices: 2 · one is in your room", "Devices: 1 · yours"][n],
     button:  ["Sign in", "Sign in", "Let it in", "goodnight"][n],
-    google:  ["Continue with Google", "Continue with Google", `Continue with ${F}`, `Continue with ${F}`][n],
-    apple:   ["Continue with Apple", "Continue with Apple", "Continue with Apple", `Continue as ${F}`][n],
+    google:  ["Continue with Cloud ID", "Continue with Cloud ID", `Continue with ${F}`, `Continue with ${F}`][n],
+    apple:   ["Continue with Passkey", "Continue with Passkey", "Continue with Passkey", `Continue as ${F}`][n],
     status:  ["Status: All systems operational", "Status: All systems operational", "Status: 1 system operational", "Status: it is operational"][n],
     newto:   ["New to Nimbus? Create an account", "New to Nimbus? Create an account", "New here? You were here 40 minutes ago.", "New here? No."][n],
     keep:    ["Keep me signed in", "Keep me signed in", "Keep me", "Keep me"][n],
