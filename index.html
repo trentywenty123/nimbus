@@ -2216,14 +2216,14 @@ const F1MAP = [
   "#..k.#..d..d..d..d..p#",
   "#....#...............#",
   "#....##..d..d..d..d..#",
-  "#....................#",
-  "###.###..d..d..d..d..#",
+  "#....D...............#",
+  "###D###..d..d..d..d..#",
   "#.....#..............#",
-  "#.....#####.######.###",
-  "#.m...#.....#....#...#",
-  "#.....#..d..#.d..#...#",
-  "#.....#.....#....#...#",
-  "###.###.....##.###...#",
+  "#.....#####D#######D##",
+  "#.m...#v..f.#r.rB#L.L#",
+  "#.....#..t..#r...#...#",
+  "#.....#.....#....#L.L#",
+  "###D#####D####D####D##",
   "#....................#",
   "#..d.......d........E#",
   "######################"
@@ -2272,6 +2272,23 @@ const F1ART = {
     this.paper = this.canvas(64, 90, (c, w, h) => { c.fillStyle = "#cfcac0"; c.fillRect(0, 0, w, h); c.fillStyle = "rgba(40,40,40,.6)"; for(let i=0;i<12;i++) c.fillRect(6, 8 + i*6, 30 + (i*13 % 22), 2);
       c.fillStyle = "#222"; c.font = "bold 7px monospace"; c.fillText("NIMBUS", 6, 86); });
     this.paperB = this.canvas(64, 90, (c, w, h) => { c.drawImage(this.paper, 0, 0); c.fillStyle = "rgba(80,4,8,.85)"; c.beginPath(); c.ellipse(36, 50, 26, 30, .4, 0, 7); c.fill(); });
+    this.door = this.canvas(128, 256, (c, w, h) => { const g = c.createLinearGradient(0, 0, w, 0); g.addColorStop(0, "#3a2c20"); g.addColorStop(.5, "#45352a"); g.addColorStop(1, "#33271d"); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      this.noise(c, w, h, 4000, .07); c.strokeStyle = "rgba(0,0,0,.35)"; c.lineWidth = 3; c.strokeRect(14, 16, w - 28, 96); c.strokeRect(14, 130, w - 28, 104);
+      c.fillStyle = "#6a6a6e"; c.fillRect(0, h - 26, w, 26); c.fillStyle = "rgba(60,4,8,.7)"; c.fillRect(70, 150, 6, 90); c.fillRect(82, 170, 4, 70); });
+    this.vend = this.canvas(128, 256, (c, w, h) => { c.fillStyle = "#08121c"; c.fillRect(0, 0, w, h); c.fillStyle = "#123a5a"; c.fillRect(8, 8, 86, 200);
+      const cols = ["#e8423a","#f2c230","#3ab0e8","#7ae85a","#e88a3a"]; for(let r=0;r<6;r++) for(let k=0;k<4;k++){ c.fillStyle = cols[(r + k) % 5]; c.fillRect(14 + k*20, 16 + r*32, 14, 24); c.fillStyle = "rgba(255,255,255,.25)"; c.fillRect(14 + k*20, 16 + r*32, 3, 24); }
+      c.fillStyle = "#0a0a0a"; c.fillRect(100, 40, 20, 50); c.fillStyle = "#7dffb0"; c.font = "bold 9px monospace"; c.fillText("1.50", 101, 60); c.fillStyle = "#111"; c.fillRect(10, 214, 84, 30); });
+    this.rack = this.canvas(128, 256, (c, w, h) => { c.fillStyle = "#0b0c0e"; c.fillRect(0, 0, w, h); for(let i=0;i<14;i++){ c.fillStyle = "#16181b"; c.fillRect(8, 8 + i*17, w - 16, 14);
+      for(let k=0;k<6;k++){ c.fillStyle = Math.random() < .7 ? "#2aff6a" : (Math.random() < .5 ? "#ffb02a" : "#ff2a2a"); c.fillRect(14 + k*6, 13 + i*17, 3, 3); } c.fillStyle = "#222"; c.fillRect(70, 12 + i*17, 44, 6); } });
+    this.locker = this.canvas(128, 256, (c, w, h) => { c.fillStyle = "#4a5056"; c.fillRect(0, 0, w, h); this.noise(c, w, h, 3000, .1);
+      c.fillStyle = "#1a1c1e"; for(let i=0;i<6;i++) c.fillRect(30, 20 + i*8, w - 60, 3); for(let i=0;i<6;i++) c.fillRect(30, 200 + i*8, w - 60, 3);
+      c.fillStyle = "#2a2c2e"; c.fillRect(w - 26, 110, 8, 36); c.fillStyle = "rgba(70,4,8,.6)"; c.fillRect(20, 120, 4, 120); });
+    this.city = this.canvas(512, 256, (c, w, h) => { const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#050812"); g.addColorStop(1, "#16203a"); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      for(let b=0;b<22;b++){ const bx = b*24 + Math.random()*10, bw = 18 + Math.random()*24, bh = 60 + Math.random()*170; c.fillStyle = "#04060c"; c.fillRect(bx, h - bh, bw, bh);
+        for(let y=h - bh + 6; y<h - 4; y+=8) for(let x=bx + 3; x<bx + bw - 3; x+=6) if(Math.random() < .18){ c.fillStyle = Math.random() < .8 ? "rgba(255,210,140,.85)" : "rgba(160,200,255,.8)"; c.fillRect(x, y, 3, 4); } }
+      c.fillStyle = "rgba(255,40,40,.9)"; c.fillRect(300, 40, 3, 3); });
+    this.rain = this.canvas(256, 256, (c, w, h) => { c.strokeStyle = "rgba(180,200,230,.35)"; c.lineWidth = 1; for(let i=0;i<160;i++){ const x = Math.random()*w, y = Math.random()*h, l = 6 + Math.random()*16; c.beginPath(); c.moveTo(x, y); c.lineTo(x - 2, y + l); c.stroke(); } });
+    this.lcd = this.canvas(128, 32, () => {});
     this.exit = this.canvas(128, 48, (c, w, h) => { c.fillStyle = "#300"; c.fillRect(0, 0, w, h); c.fillStyle = "#ff3a2a"; c.font = "bold 30px sans-serif"; c.textAlign = "center"; c.fillText("EXIT", w/2, 35); });
   }
 };
@@ -2305,18 +2322,21 @@ function floorOne(){
     const tex = (cv2, rx=1, ry=1) => { const t = new T.CanvasTexture(cv2); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(rx, ry); t.encoding = T.sRGBEncoding; t.anisotropy = 4; return t; };
 
     /* ---------- the floor plan ---------- */
-    const MW = F1MAP[0].length, MH = F1MAP.length, grid = [], desks = [], monitors = [];
+    const MW = F1MAP[0].length, MH = F1MAP.length, grid = [], desks = [], monitors = [], doors = [], props = [], doorMap = new Map();
     let start = {x:1, z:1}, marisolAt = null, elev = null;
     for(let y=0;y<MH;y++){ grid.push([]); for(let x=0;x<MW;x++){ const ch = F1MAP[y][x];
-      grid[y].push(ch === "#" ? 1 : ch === "E" ? 2 : (ch === "d" || ch === "k" || ch === "m" || ch === "p") ? 3 : 0);
+      grid[y].push(ch === "#" ? 1 : ch === "E" ? 2 : ch === "D" ? 4 : "dkmpvftrBL".includes(ch) ? 3 : 0);
+      if(ch === "D") doors.push({gx:x, gy:y, t:0, target:0}); if("vftrBL".includes(ch)) props.push({ch, gx:x, gy:y, x:x*CELL + 1, z:y*CELL + 1});
       const wx = x*CELL + CELL/2, wz = y*CELL + CELL/2;
       if(ch === "S") start = {x:wx, z:wz};
       if(ch === "d" || ch === "k") desks.push({x:wx, z:wz, on: ch === "k" || (x*7 + y*3) % 4 === 0});
       if(ch === "m") marisolAt = {x:wx, z:wz};
       if(ch === "E") elev = {gx:x, gy:y}; } }
+    doors.forEach(d => doorMap.set(d.gy*MW + d.gx, d));
     const cellAt = (x, z) => { const gx = Math.floor(x/CELL), gz = Math.floor(z/CELL); return (gz < 0 || gx < 0 || gz >= MH || gx >= MW) ? 1 : grid[gz][gx]; };
-    const solid = (x, z) => cellAt(x, z) !== 0;
-    const opaque = (x, z) => { const c = cellAt(x, z); return c === 1 || c === 2; };
+    const doorAtXZ = (x, z) => doorMap.get(Math.floor(z/CELL)*MW + Math.floor(x/CELL));
+    const solid = (x, z) => { const c = cellAt(x, z); if(c === 4) return doorAtXZ(x, z).t < .85; return c !== 0; };
+    const opaque = (x, z) => { const c = cellAt(x, z); if(c === 4) return doorAtXZ(x, z).t < .5; return c === 1 || c === 2; };
 
     /* ---------- materials ---------- */
     const mWall = new T.MeshStandardMaterial({map:tex(F1ART.wall), roughness:.92}), mWallB = new T.MeshStandardMaterial({map:tex(F1ART.wallBlood), roughness:.85});
@@ -2336,7 +2356,7 @@ function floorOne(){
       const c = new T.Mesh(new T.PlaneGeometry(MW*CELL, MH*CELL), mCeil); c.rotation.x = Math.PI/2; c.position.set(MW, WH, MH); scene.add(c); }
     /* desks, chairs, monitors */
     const screenMat = new T.MeshBasicMaterial({map:tex(F1ART.screen)}), offMat = new T.MeshStandardMaterial({color:0x050607, roughness:.2, metalness:.3});
-    for(const d of desks){ const g = new T.Group(); g.position.set(d.x, 0, d.z); g.rotation.y = ((d.x*3 + d.z) % 4) * .05; scene.add(g);
+    for(const d of desks){ const g = new T.Group(); d.g = g; g.position.set(d.x, 0, d.z); g.rotation.y = ((d.x*3 + d.z) % 4) * .05; scene.add(g);
       box(1.7, .06, .85, mDesk, 0, .76, 0, g); for(const [lx, lz] of [[-.78,-.36],[.78,-.36],[-.78,.36],[.78,.36]]) box(.05, .74, .05, mMetal, lx, .37, lz, g);
       box(1.6, .5, .03, mDesk, 0, .5, -.4, g);
       box(.5, .34, .04, mMetal, 0, 1.0, -.15, g); box(.06, .14, .06, mMetal, 0, .83, -.15, g);
@@ -2352,7 +2372,7 @@ function floorOne(){
       const lm = new T.MeshStandardMaterial({color:0x17241a, roughness:.8}); for(let i=0;i<9;i++){ const l = new T.Mesh(new T.ConeGeometry(.05, 1.2, 4), lm); l.position.set(Math.cos(i)*.15, 1, Math.sin(i)*.15); l.rotation.set(Math.sin(i)*.5, 0, Math.cos(i)*.5); g.add(l); } }
 
     /* ---------- lights ---------- */
-    scene.add(new T.HemisphereLight(0x1a1c26, 0x050404, .22));
+    const hemi = new T.HemisphereLight(0x1a1c26, 0x050404, .22); scene.add(hemi);
     const flash = new T.SpotLight(0xfff0d8, 1.6, 24, .48, .6, 2); flash.castShadow = true; flash.shadow.mapSize.set(1024, 1024); flash.shadow.camera.near = .2; flash.shadow.bias = -.0004;
     flash.position.set(.24, -.24, -.68); camera.add(flash); const flashT = new T.Object3D(); flashT.position.set(0, -.05, -3); camera.add(flashT); flash.target = flashT;
     const pl = (col, i, d, x, y, z) => { const l = new T.PointLight(col, i, d, 2); l.position.set(x, y, z); l.base = i; scene.add(l); return l; };
@@ -2365,8 +2385,15 @@ function floorOne(){
     for(let i=0;i<70;i++){ const [gx, gy] = walk[(i*37 + 11) % walk.length]; const pp = new T.Mesh(new T.PlaneGeometry(.21, .3), i % 6 === 0 ? mPaperB : mPaper);
       pp.rotation.set(-Math.PI/2, 0, (i*1.7) % 6.28); pp.position.set(gx*CELL + .3 + (i*.37 % 1.4), .006 + (i % 5)*.001, gy*CELL + .3 + (i*.53 % 1.4)); pp.receiveShadow = true; scene.add(pp); }
     const mKey = new T.MeshStandardMaterial({color:0x1a1a1c, roughness:.6}), mMug = new T.MeshStandardMaterial({color:0xd8d0c0, roughness:.4});
+    /* things you can pick up: mugs and bottles to throw, batteries for the light */
+    const items = [], mBottle = new T.MeshStandardMaterial({color:0x2a6a3a, roughness:.15, metalness:.1, transparent:true, opacity:.85}), mBatt = new T.MeshStandardMaterial({color:0x1a1a1a, emissive:0x2a6a10, emissiveIntensity:.9, roughness:.4});
+    function addItem(kind, x, y, z){
+      let m; if(kind === "mug"){ m = new T.Group(); const b = new T.Mesh(new T.CylinderGeometry(.042, .036, .1, 14), mMug); m.add(b); const hdl = new T.Mesh(new T.TorusGeometry(.026, .007, 6, 10), mMug); hdl.position.x = .05; m.add(hdl); }
+      else if(kind === "bottle"){ m = new T.Group(); const b = new T.Mesh(new T.CylinderGeometry(.035, .035, .2, 12), mBottle); m.add(b); const nk = new T.Mesh(new T.CylinderGeometry(.012, .03, .08, 10), mBottle); nk.position.y = .14; m.add(nk); }
+      else { m = new T.Group(); const b = new T.Mesh(new T.CylinderGeometry(.02, .02, .09, 10), mBatt); b.rotation.z = Math.PI/2; m.add(b); const tip = new T.Mesh(new T.CylinderGeometry(.008, .008, .012, 8), mMetal); tip.rotation.z = Math.PI/2; tip.position.x = .05; m.add(tip); }
+      m.position.set(x, y, z); m.traverse(o => { o.castShadow = true; }); scene.add(m); items.push({kind, mesh:m, home:new T.Vector3(x, y, z), state:"rest", v:new T.Vector3()}); return m; }
     desks.forEach((d, i) => { box(.44, .02, .15, mKey, d.x - .05, .8, d.z + .1, scene, false);
-      if(i % 2 === 0){ const m = new T.Mesh(new T.CylinderGeometry(.04, .035, .1, 10), mMug); m.position.set(d.x + .55, .84, d.z + .12); m.castShadow = true; scene.add(m); }
+      if(i % 2 === 0) addItem("mug", d.x + .55, .84, d.z + .12);
       if(i % 3 === 1) box(.24, .07, .31, mPaper, d.x - .55, .82, d.z + .05, scene); });
     const mDrawer = new T.MeshStandardMaterial({map:tex(F1ART.drawers), roughness:.5, metalness:.3});
     for(const [x, z, ry] of [[1.5, 9.6, Math.PI/2], [1.5, 15.4, Math.PI/2], [27, 1.5, 0], [31, 1.5, 0], [42.5, 11, -Math.PI/2], [25, 17.4, Math.PI], [35.5, 19, -Math.PI/2]]){
@@ -2381,6 +2408,60 @@ function floorOne(){
     dustG.setAttribute("position", new T.BufferAttribute(dustP, 3));
     const dust = new T.Points(dustG, new T.PointsMaterial({color:0xd8d0c0, size:.005, transparent:true, opacity:.3, depthWrite:false})); camera.add(dust);
 
+    /* ---------- doors: they open on hinges; closed ones block sight ---------- */
+    const mDoor2 = new T.MeshStandardMaterial({map:tex(F1ART.door), roughness:.7}), mHandle = new T.MeshStandardMaterial({color:0x9a9890, roughness:.3, metalness:.8});
+    const startOpen = {"11,8":1, "19,12":1};
+    for(const d of doors){ const alongX = grid[d.gy][d.gx - 1] === 1 && grid[d.gy][d.gx + 1] === 1; d.alongX = alongX;
+      d.cx = d.gx*CELL + 1; d.cz = d.gy*CELL + 1; d.pivot = new T.Group(); scene.add(d.pivot);
+      if(alongX){ d.pivot.position.set(d.gx*CELL + .1, 0, d.cz); const pn = box(1.8, 2.5, .07, mDoor2, .9, 1.25, 0, d.pivot); const hd = new T.Mesh(new T.SphereGeometry(.04, 10, 8), mHandle); hd.position.set(1.6, 1.05, .07); d.pivot.add(hd); const hd2 = hd.clone(); hd2.position.z = -.07; d.pivot.add(hd2); box(CELL, .5, .24, mWall, d.cx, 2.75, d.cz, scene, false); }
+      else { d.pivot.position.set(d.cx, 0, d.gy*CELL + .1); const pn = box(.07, 2.5, 1.8, mDoor2, 0, 1.25, .9, d.pivot); const hd = new T.Mesh(new T.SphereGeometry(.04, 10, 8), mHandle); hd.position.set(.07, 1.05, 1.6); d.pivot.add(hd); const hd2 = hd.clone(); hd2.position.x = -.07; d.pivot.add(hd2); box(.24, .5, CELL, mWall, d.cx, 2.75, d.cz, scene, false); }
+      d.t = d.target = startOpen[d.gx + "," + d.gy] ? 1 : 0; d.pivot.rotation.y = (alongX ? -1 : 1)*1.45*d.t; }
+    const setDoor = (d, open, who) => { if(d.target === (open ? 1 : 0)) return; d.target = open ? 1 : 0; const dd = Math.hypot(d.cx - P.x, d.cz - P.z), an = relAng(d.cx, d.cz);
+      if(who === "it"){ footstep(dd*.6, an, true); AU.thump(); } else AU.creak(); if(dd < 18) marks.push({ang:an, life:1, loud:Math.min(1, 2/(1 + dd*.25)), kind:"crack"}); };
+    const nearDoor = () => doors.find(d => Math.hypot(d.cx - P.x, d.cz - P.z) < 2.3 && Math.floor(P.x/CELL)*1000 + Math.floor(P.z/CELL) !== d.gx*1000 + d.gy);
+
+    /* ---------- the break room, the server room, the storage room ---------- */
+    const mFridge = new T.MeshStandardMaterial({color:0xc8c4ba, roughness:.35, metalness:.2}), mVend = new T.MeshBasicMaterial({map:tex(F1ART.vend)});
+    const mRack = new T.MeshStandardMaterial({map:tex(F1ART.rack), emissive:0xffffff, emissiveMap:tex(F1ART.rack), emissiveIntensity:.55, roughness:.4}), mLocker = new T.MeshStandardMaterial({map:tex(F1ART.locker), roughness:.5, metalness:.4});
+    const racks = [], lockers = []; let breaker = null;
+    for(const pr of props){
+      if(pr.ch === "v"){ box(.95, 1.95, .85, mMetal, pr.x - .5, .98, pr.z); const f = new T.Mesh(new T.PlaneGeometry(.7, 1.6), mVend); f.position.set(pr.x - .02, 1.05, pr.z); f.rotation.y = Math.PI/2; scene.add(f); LIGHTS.push(pl(0x4a8aff, .55, 5, pr.x + .5, 1.2, pr.z)); }
+      if(pr.ch === "f"){ box(.8, 1.85, .7, mFridge, pr.x, .93, pr.z - .6); box(.02, .5, .03, mHandle, pr.x + .32, 1.3, pr.z - .24); const sm = new T.Mesh(new T.PlaneGeometry(.5, .2), mBlood); sm.position.set(pr.x, .3, pr.z - .24); scene.add(sm); }
+      if(pr.ch === "t"){ const top = new T.Mesh(new T.CylinderGeometry(.6, .6, .05, 24), mDesk); top.position.set(pr.x, .74, pr.z); top.castShadow = top.receiveShadow = true; scene.add(top);
+        const leg = new T.Mesh(new T.CylinderGeometry(.05, .05, .72, 8), mMetal); leg.position.set(pr.x, .36, pr.z); scene.add(leg);
+        for(let k=0;k<3;k++){ const a = k*2.1, cx2 = pr.x + Math.cos(a)*.85, cz2 = pr.z + Math.sin(a)*.85; box(.4, .05, .4, mMetal, cx2, .46, cz2); const bk = box(.4, .45, .05, mMetal, cx2 + Math.cos(a)*.18, .7, cz2 + Math.sin(a)*.18); bk.rotation.y = -a + Math.PI/2; }
+        addItem("bottle", pr.x + .2, .87, pr.z - .1); addItem("bottle", pr.x - .25, .87, pr.z + .15); addItem("battery", pr.x, .78, pr.z + .3); }
+      if(pr.ch === "r"){ const rk = box(.8, 2.3, 1.1, mRack, pr.x, 1.15, pr.z); racks.push(rk); }
+      if(pr.ch === "B"){ const g = new T.Group(); g.position.set(pr.x, 0, pr.z - .92); scene.add(g); box(.7, .9, .14, mMetal, 0, 1.4, 0, g);
+        const lever = new T.Group(); lever.position.set(0, 1.4, .1); g.add(lever); box(.06, .3, .06, new T.MeshStandardMaterial({color:0xaa2a1a, roughness:.4}), 0, .15, 0, lever);
+        const led = new T.Mesh(new T.SphereGeometry(.025, 8, 6), new T.MeshBasicMaterial({color:0xff2a1a})); led.position.set(.24, 1.7, .08); g.add(led);
+        const sg = new T.Mesh(new T.PlaneGeometry(.5, .12), new T.MeshBasicMaterial({map:tex(F1ART.canvas(128, 32, (c) => { c.fillStyle = "#c8a020"; c.fillRect(0, 0, 128, 32); c.fillStyle = "#000"; c.font = "bold 16px sans-serif"; c.fillText("⚡ MAIN / ELEV", 8, 22); }))})); sg.position.set(0, 1.95, .08); g.add(sg);
+        lever.rotation.x = .9; breaker = {g, lever, led, x:pr.x, z:pr.z - .6}; }
+      if(pr.ch === "L"){ const face = pr.gx === 18 ? 1 : -1; const lk = box(.75, 2.05, .65, mLocker, pr.x, 1.03, pr.z); lk.rotation.y = face*Math.PI/2; lockers.push({x:pr.x, z:pr.z, face, mesh:lk}); }
+    }
+    addItem("battery", 7.2, .82, 5.3); addItem("battery", 39, .05, 21); addItem("battery", 23, .82, 13.2); addItem("bottle", 38.5, .05, 20.4);
+    for(let i=0;i<4;i++){ const sp = new T.Mesh(new T.CylinderGeometry(.01, .01, .7, 4), mDark); sp.position.set(27 + i*.15, 2.6, 19 + i*.4); sp.rotation.z = .3*i; scene.add(sp); }   // server room cables
+
+    /* ---------- windows: the city, in the rain ---------- */
+    const cityT = tex(F1ART.city), rainT = tex(F1ART.rain, 1, 1); const mCity = new T.MeshBasicMaterial({map:cityT, fog:false}), mRain = new T.MeshBasicMaterial({map:rainT, transparent:true, fog:false, depthWrite:false});
+    for(let x=7;x<=19;x++){ if(grid[0][x] !== 1 || grid[1][x] !== 0) continue; const w1 = new T.Mesh(new T.PlaneGeometry(1.7, 1.3), mCity.clone()); w1.material.map = cityT.clone(); w1.material.map.offset.x = (x*.13) % 1; w1.material.map.repeat.set(.25, 1); w1.material.map.needsUpdate = true;
+      w1.position.set(x*CELL + 1, 1.85, 2.02); scene.add(w1); const r1 = new T.Mesh(new T.PlaneGeometry(1.7, 1.3), mRain); r1.position.set(x*CELL + 1, 1.85, 2.03); scene.add(r1);
+      box(1.8, .06, .1, mMetal, x*CELL + 1, 1.2, 2.05, scene, false); box(1.8, .06, .1, mMetal, x*CELL + 1, 2.5, 2.05, scene, false); }
+
+    /* ---------- the desk phone that rings with your name ---------- */
+    const lcdT = new T.CanvasTexture(F1ART.lcd); const drawLcd = txt => { const c = F1ART.lcd.getContext("2d"); c.fillStyle = "#9bd06a"; c.fillRect(0, 0, 128, 32); c.fillStyle = "#102010"; c.font = "bold 13px monospace"; c.fillText(txt.slice(0, 15), 4, 21); lcdT.needsUpdate = true; };
+    drawLcd("");
+    const phoneAt = {x:16.4, z:5.5}; box(.2, .07, .16, new T.MeshStandardMaterial({color:0xd6cfbe, roughness:.4}), phoneAt.x, .82, phoneAt.z); { const lcd = new T.Mesh(new T.PlaneGeometry(.12, .03), new T.MeshBasicMaterial({map:lcdT})); lcd.rotation.x = -Math.PI/2.4; lcd.position.set(phoneAt.x, .86, phoneAt.z + .05); scene.add(lcd); }
+
+    /* ---------- the monitor that shows what is behind you ---------- */
+    const rt = new T.WebGLRenderTarget(384, 240), camB = new T.PerspectiveCamera(58, 384/240, .05, 40); camB.layers.enable(1); scene.add(camB); const irLight = new T.PointLight(0xd8ffe0, 0, 9, 1.6); scene.add(irLight);
+    const me = new T.Group(); scene.add(me); { const coat = new T.MeshStandardMaterial({color:0x1a1c22, roughness:.9}); const b1 = new T.Mesh(new T.CylinderGeometry(.2, .22, 1.05, 14), coat); b1.position.y = 1.0; me.add(b1);
+      const hd = new T.Mesh(new T.SphereGeometry(.12, 14, 12), new T.MeshStandardMaterial({color:0x2a2420, roughness:.8})); hd.position.y = 1.65; hd.scale.set(1, 1.15, 1); me.add(hd);
+      for(const s2 of [-1, 1]){ const lg = new T.Mesh(new T.CylinderGeometry(.08, .07, .5, 8), coat); lg.position.set(s2*.09, .25, 0); me.add(lg); }
+      me.traverse(o => o.layers.set(1)); }
+    const mirrorDesk = desks.reduce((a, d) => (!a || Math.hypot(d.x - 25, d.z - 9) < Math.hypot(a.x - 25, a.z - 9)) ? d : a, null);
+    if(mirrorDesk && !mirrorDesk.screen){ const s2 = new T.Mesh(new T.PlaneGeometry(.45, .28), new T.MeshBasicMaterial({color:0x050607})); s2.position.set(0, 1.0, -.118); mirrorDesk.g.add(s2); mirrorDesk.screen = s2; mirrorDesk.offScreen = true; }
+
     /* ---------- Marisol ---------- */
     const mar = new T.Group(), MR = {}; if(marisolAt){ mar.position.set(marisolAt.x, 0, marisolAt.z); mar.rotation.y = 0; scene.add(mar);
       const mPhone = new T.MeshStandardMaterial({color:0xd6cfbe, roughness:.35});
@@ -2388,7 +2469,8 @@ function floorOne(){
       box(.2, .07, .16, mPhone, -.45, .82, -.5, mar); box(.3, .05, .38, mPaper, .35, .81, -.55, mar);
       box(.5, .06, .5, mMetal, 0, .46, .2, mar); box(.5, .62, .06, mMetal, 0, .8, .46, mar);
       const cardigan = new T.MeshStandardMaterial({color:0x34313c, roughness:.95});
-      const torso = new T.Mesh(new T.CylinderGeometry(.16, .21, .6, 12), cardigan); torso.position.set(0, .8, .2); torso.rotation.x = -.22; torso.castShadow = true; mar.add(torso);
+      const mProf = [[0, 0], [.2, .02], [.21, .1], [.17, .25], [.16, .35], [.19, .48], [.18, .56], [.1, .62], [.05, .66], [0, .67]].map(([r, y]) => new T.Vector2(r, y));
+      const torso = new T.Mesh(new T.LatheGeometry(mProf, 20), cardigan); torso.scale.z = .75; torso.position.set(0, .5, .2); torso.rotation.x = -.22; torso.castShadow = true; mar.add(torso);
       for(const s of [-1, 1]){ const th = new T.Mesh(new T.CylinderGeometry(.075, .065, .45, 8), cardigan); th.rotation.x = Math.PI/2; th.position.set(s*.1, .52, .02); mar.add(th);
         const sh = new T.Mesh(new T.CylinderGeometry(.055, .045, .45, 8), mDark); sh.position.set(s*.1, .25, -.2); mar.add(sh); }
       // left arm limp on the desk
@@ -2439,13 +2521,21 @@ function floorOne(){
     /* ---------- the creature: built from people ---------- */
     const CR = new T.Group(); scene.add(CR); CR.visible = false;
     const mFlesh = new T.MeshStandardMaterial({color:0x9a8f84, map:tex(F1ART.skin, 1, 3), roughness:.7}), mFleshD = new T.MeshStandardMaterial({color:0x5a4f46, roughness:.8});
-    const limb = (len, r0, r1, m) => { const g = new T.Group(), mesh = new T.Mesh(new T.CylinderGeometry(r0, r1, len, 8), m); mesh.position.y = -len/2; mesh.castShadow = true; g.add(mesh); g.len = len; return g; };
+    const limb = (len, r0, r1, m) => { const g = new T.Group(), mesh = new T.Mesh(new T.CylinderGeometry(r0, r1, len, 12), m); mesh.position.y = -len/2; mesh.castShadow = true; g.add(mesh);
+      const jt = new T.Mesh(new T.SphereGeometry(r0*1.15, 12, 10), m); jt.castShadow = true; g.add(jt); g.len = len; return g; };                                        // every joint is a knuckle
     const hips = new T.Group(); hips.position.y = 1.35; CR.add(hips);
     const spine = new T.Group(); hips.add(spine); spine.rotation.x = .35;
-    const torsoM = new T.Mesh(new T.CylinderGeometry(.13, .1, .85, 9), mFlesh); torsoM.position.y = .42; torsoM.castShadow = true; spine.add(torsoM);
-    for(let i=0;i<5;i++){ const rib = new T.Mesh(new T.TorusGeometry(.12 - i*.006, .012, 4, 12, Math.PI), mFleshD); rib.position.set(0, .55 - i*.07, .02); rib.rotation.set(0, Math.PI/2, Math.PI/2); spine.add(rib); }
-    for(const [y, x] of [[.5, .03], [.3, -.04]]){ const f = new T.Mesh(new T.SphereGeometry(.06, 10, 8), mGore); f.position.set(x, y, .1); f.scale.set(1, 1.3, .5); spine.add(f);   // a face, pushing out through the chest
-      const fs = new T.Mesh(new T.SphereGeometry(.045, 10, 8), mFlesh); fs.position.set(x, y, .125); fs.scale.set(1, 1.3, .5); spine.add(fs); }
+    const torsoProfile = [[.0, .0], [.1, .02], [.12, .07], [.085, .2], [.07, .3], [.1, .4], [.15, .5], [.16, .6], [.15, .7], [.17, .78], [.13, .84], [.05, .9], [0, .91]].map(([r, y]) => new T.Vector2(r, y));
+    const torsoM = new T.Mesh(new T.LatheGeometry(torsoProfile, 22), mFlesh); torsoM.scale.z = .7; torsoM.castShadow = true; spine.add(torsoM);                      // starved: a waist you could close a hand around, a ribcage that isn't
+    for(let i=0;i<10;i++){ const v = new T.Mesh(new T.SphereGeometry(.022, 8, 6), mFleshD); v.position.set(0, .12 + i*.075, -.1 - Math.sin(i*.35)*.01); v.scale.set(1.3, .8, 1); spine.add(v); }   // the spine shows
+    for(const sx of [-1, 1]){ const bl = new T.Mesh(new T.SphereGeometry(.07, 12, 10), mFlesh); bl.position.set(sx*.08, .7, -.075); bl.scale.set(1, 1.3, .35); bl.rotation.z = sx*.3; spine.add(bl); }
+    for(let i=0;i<6;i++){ const rib = new T.Mesh(new T.TorusGeometry(.148 - Math.abs(i - 2)*.008, .008, 5, 16, Math.PI*.9), mFlesh); rib.position.set(0, .72 - i*.055, .015); rib.scale.set(1, 1, .72); rib.rotation.set(Math.PI/2, 0, Math.PI*.05); spine.add(rib); }
+    const mChestFace = new T.MeshStandardMaterial({map:tex(F1ART.marisolFace), transparent:true, alphaTest:.1, roughness:.5});
+    for(const [y, x, sz] of [[.55, .035, .1], [.36, -.03, .085]]){                                                  // faces, pushing out through the chest
+      const ring = new T.Mesh(new T.TorusGeometry(sz*.48, .012, 6, 16), mGore); ring.position.set(x, y, .105); ring.scale.set(1, 1.3, 1); spine.add(ring);
+      const pit = new T.Mesh(new T.CircleGeometry(sz*.5, 16), mGore); pit.position.set(x, y, .1); pit.scale.set(1, 1.3, 1); spine.add(pit);
+      const fp = new T.Mesh(new T.PlaneGeometry(sz, sz*1.25), mChestFace); fp.position.set(x, y, .112); spine.add(fp);
+      for(let k=0;k<3;k++){ const dr = new T.Mesh(new T.CylinderGeometry(.004, .003, .08 + k*.05, 4), mGore); dr.position.set(x - .02 + k*.02, y - sz*.7 - k*.02, .108); spine.add(dr); } }
     const neck = new T.Group(); neck.position.y = .86; spine.add(neck);
     const neckM = new T.Mesh(new T.CylinderGeometry(.035, .045, .38, 6), mFlesh); neckM.position.y = .19; neck.add(neckM);
     const headG = new T.Group(); headG.position.y = .42; neck.add(headG);
@@ -2460,25 +2550,33 @@ function floorOne(){
       const sh = new T.Group(); sh.position.set(s*.2, shoulderY, 0); spine.add(sh);
       const up = limb(.62, .04, .032, mFlesh); sh.add(up); const el = new T.Group(); el.position.y = -.62; up.add(el);
       const lo = limb(.72, .032, .025, mFlesh); el.add(lo); const wr = new T.Group(); wr.position.y = -.72; lo.add(wr);
-      for(let f=0;f<4;f++){ const fg = limb(.26, .009, .005, mFleshD); fg.rotation.set(.1 + f*.05, 0, (f - 1.5)*.12*s); wr.add(fg); }
-      arms.push({sh, el, s});
+      const fingersA = [];
+      for(let f=0;f<4;f++){ const fg = limb(.15, .011, .008, mFleshD); fg.rotation.set(.1 + f*.05, 0, (f - 1.5)*.13*s); wr.add(fg);              // long fingers, two joints each
+        const k2 = new T.Group(); k2.position.y = -.15; fg.add(k2); const tip = limb(.14, .008, .004, mFleshD); k2.add(tip); fg.k = k2; fingersA.push(fg); }
+      arms.push({sh, el, s, fingers:fingersA});
       const hp = new T.Group(); hp.position.set(s*.09, 0, 0); hips.add(hp);
       const th = limb(.66, .05, .035, mFlesh); hp.add(th); const kn = new T.Group(); kn.position.y = -.66; th.add(kn);
       const sn = limb(.66, .035, .025, mFlesh); kn.add(sn); legs.push({hp, kn, s});
       for(let i=0;i<3;i++){ const st = new T.Mesh(new T.CylinderGeometry(.006, .004, .2 + i*.08, 4), mGore); st.position.set(.02*i - .02, -.25 - i*.1, .03); th.add(st); } }
     const crPos = new T.Vector3(); let pose = 0, poseT = 0, twitch = 0;
-    function poseCreature(mode, dt, dist){
+    function poseCreature(mode0, dt, dist){
+      const mode = mode0 === "check" ? "hunt" : mode0 === "listen" ? "search" : mode0;
       poseT += dt; const fps = mode === "hunt" ? 14 : 8; if(poseT < 1/fps) return; poseT = 0;                     // stop-motion: it only updates a few times a second
+      if(mode === "behind"){                                                                                       // right behind you, reaching for your shoulders
+        legs.forEach(L => { L.hp.rotation.x = 0; L.kn.rotation.x = .2; }); arms.forEach(A => { A.sh.rotation.x = -1.05 + Math.random()*.06; A.sh.rotation.z = A.s*.05; A.el.rotation.x = -.55; });
+        spine.rotation.x = .55; neck.scale.y = 1.3; headG.rotation.set(-.35, 0, .45 + (Math.random() - .5)*.2); face.material.map = faceOpenTex; face.material.needsUpdate = true; return; }
       const speed = mode === "hunt" ? 1 : mode === "search" ? .15 : .55; pose += speed*1.25;
       const sw = Math.sin(pose)*.55*speed + .05, hunting = mode === "hunt";
       legs.forEach(L => { L.hp.rotation.x = sw*L.s; L.kn.rotation.x = Math.max(0, -sw*L.s)*.9 + .15; });
-      arms.forEach(A => { A.sh.rotation.x = hunting ? -1.1 + Math.sin(pose*2 + A.s)*.25 : -sw*A.s*.5 + .1; A.sh.rotation.z = A.s*(hunting ? .25 : .08); A.el.rotation.x = hunting ? -.4 : -.15; });
+      arms.forEach(A => { A.sh.rotation.x = hunting ? -1.1 + Math.sin(pose*2 + A.s)*.25 : -sw*A.s*.5 + .1; A.sh.rotation.z = A.s*(hunting ? .25 : .08); A.el.rotation.x = hunting ? -.4 : -.15;
+        A.fingers.forEach((f, i) => { f.rotation.x = .1 + i*.05 + (hunting ? -.35 : .25); f.k.rotation.x = hunting ? -.5 : .6; }); });
       spine.rotation.x = hunting ? .75 : mode === "search" ? .2 : .4;
       if(Math.random() < .12) twitch = (Math.random() - .5)*1.1;
       neck.scale.y = mode === "search" ? 1.9 : hunting ? 1.15 : 1;
-      headG.rotation.set(hunting ? -.5 : 0, mode === "search" ? Math.sin(pose*.7)*1.2 : 0, .25 + twitch);
+      headG.rotation.set(hunting ? -.5 : 0, mode === "search" ? Math.sin(pose*.7)*1.2 : 0, (mode0 === "listen" ? .9 : .25) + twitch);
       face.material.map = dist < 3 || hunting ? faceOpenTex : faceTex; face.material.needsUpdate = true;
     }
+
 
     /* ---------- the hand that holds the light ---------- */
     const hand = new T.Group(); camera.add(hand); hand.position.set(.26, -.3, -.5);
@@ -2503,24 +2601,26 @@ function floorOne(){
       flash.color.set(dmg >= 4 ? 0xffc0a8 : dmg >= 2 ? 0xffe0c8 : 0xfff0d8); };
 
     /* ---------- player and story state ---------- */
-    const P = {x:start.x, z:start.z, yaw:0, pitch:0, bob:0, stamina:1, hidden:null, breath:1, holding:false, eye:1.62, vx:0, vz:0, sway:0, cy:1.62, cx:null, cz:null};
+    const P = {x:start.x, z:start.z, yaw:0, pitch:0, bob:0, stamina:1, hidden:null, breath:1, holding:false, eye:1.62, vx:0, vz:0, sway:0, cy:1.62, cx:null, cz:null, bat:1, held:null};
     for(const [dx, dz, yaw] of [[1,0,-Math.PI/2],[0,1,Math.PI],[-1,0,Math.PI/2],[0,-1,0]]) if(!solid(P.x + dx*CELL, P.z + dz*CELL)){ P.yaw = yaw; break; }
-    const WAY = [[10,3],[19,3],[19,7],[9,7],[11,10],[9,13],[19,13],[15,10],[19,10],[8,5]].map(([x,y]) => [x*CELL+1, y*CELL+1]);
+    const WAY = [[10,3],[19,3],[19,7],[9,7],[8,10],[9,13],[19,13],[14,10],[19,10],[8,5],[3,9],[3,13],[15,13]].map(([x,y]) => [x*CELL+1, y*CELL+1]);
     const C = {x:39, z:27, mode:"hidden", path:[], pt:0, tgt:null, wi:0, step:0, lastX:0, lastZ:0, searchT:0, grace:0, yaw:0};
     let fl = true, flick = 1, flickT = 0, t = 0, hasCard = false, checkpoint = {x:P.x, z:P.z, yaw:P.yaw}, caught = false, done = false, paused = false;
     let sub = null, subT = 0, objective = "Find Marisol's office. It's through the gap at the bottom of this room.";
-    const scripted = {glimpse:false, phone:false, printer:false, hint:false, elevCalled:0, elevOpen:false, elevSent:false};
+    const scripted = {glimpse:false, phone:false, printer:false, hint:false, elevCalled:0, elevOpen:false, elevSent:false, mirror:null, phone2:null, batDead:false};
+    let powered = false, surge = 0;
     const marks = [];   // where sounds came from, drawn at the edge of the screen
     const say = (txt, sec=4.5, who="s") => { sub = {txt, who}; subT = sec; };
     const setObj = txt => { objective = txt; AU.notif(); };
 
     /* ---------- input ---------- */
     const K = {}; let lookDX = 0, lookDY = 0, dragging = null;
-    const kd = e => { const k = e.key.toLowerCase(); K[k] = true; if(k === "f") toggleLight(); if(k === "e") action(); if(k === " "){ e.preventDefault(); P.holding = true; }
+    const kd = e => { const k = e.key.toLowerCase(); K[k] = true; if(k === "f") toggleLight(); if(k === "e") action(); if(k === "r") throwItem(); if(k === " "){ e.preventDefault(); P.holding = true; }
       if(["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"," "].includes(k)) e.preventDefault(); };
     const ku = e => { const k = e.key.toLowerCase(); K[k] = false; if(k === " ") P.holding = false; };
     addEventListener("keydown", kd); addEventListener("keyup", ku);
-    const md = e => { dragging = [e.clientX, e.clientY]; try{ cv.requestPointerLock && cv.requestPointerLock(); }catch(x){} };
+    cv.addEventListener("contextmenu", e => { e.preventDefault(); throwItem(); });
+    const md = e => { if(e.button === 2) return; dragging = [e.clientX, e.clientY]; try{ cv.requestPointerLock && cv.requestPointerLock(); }catch(x){} };
     const mm = e => { if(document.pointerLockElement === cv){ lookDX += e.movementX; lookDY += e.movementY; } else if(dragging){ lookDX += e.clientX - dragging[0]; lookDY += e.clientY - dragging[1]; dragging = [e.clientX, e.clientY]; } };
     const mu = () => { dragging = null; };
     cv.addEventListener("mousedown", md); addEventListener("mousemove", mm); addEventListener("mouseup", mu);
@@ -2537,7 +2637,7 @@ function floorOne(){
       #f1ui .look{ position:absolute; inset:0; pointer-events:auto; touch-action:none }
     </style>
     ${touch ? `<div class="look"></div><div class="stick"><div class="nub"></div></div>` : ""}
-    <div class="btns">${touch ? `<button class="light on">LIGHT</button><button class="run">RUN</button>` : ""}<button class="act">ACTION</button></div>
+    <div class="btns">${touch ? `<button class="light on">LIGHT</button><button class="run">RUN</button>` : ""}<button class="throw" style="grid-column:span 2;display:none;border-color:#ffcc4d;color:#ffe9a8">THROW</button><button class="act">ACTION</button></div>
     <button class="breath">HOLD TO HOLD YOUR BREATH</button>`;
     document.body.appendChild(ui);
     const btnAct = ui.querySelector(".act"), btnBreath = ui.querySelector(".breath"), btnLight = ui.querySelector(".light"), btnRun = ui.querySelector(".run");
@@ -2555,17 +2655,18 @@ function floorOne(){
       btnRun.addEventListener("touchstart", e => { e.preventDefault(); K.shift = true; btnRun.classList.add("on"); }, {passive:false});
       btnRun.addEventListener("touchend", () => { K.shift = false; btnRun.classList.remove("on"); });
     }
+    const btnThrow = ui.querySelector(".throw"); btnThrow.addEventListener("click", () => throwItem()); btnThrow.addEventListener("touchstart", e => { e.preventDefault(); throwItem(); }, {passive:false});
     btnAct.addEventListener("click", () => action()); btnAct.addEventListener("touchstart", e => { e.preventDefault(); action(); }, {passive:false});
     const holdOn = e => { e.preventDefault(); P.holding = true; }, holdOff = () => { P.holding = false; };
     btnBreath.addEventListener("touchstart", holdOn, {passive:false}); btnBreath.addEventListener("touchend", holdOff);
     btnBreath.addEventListener("mousedown", holdOn); btnBreath.addEventListener("mouseup", holdOff); btnBreath.addEventListener("mouseleave", holdOff);
-    function toggleLight(){ if(P.hidden) return; fl = !fl; AU.click(); if(btnLight) btnLight.classList.toggle("on", fl); }
+    function toggleLight(){ if(P.hidden) return; if(!fl && P.bat <= 0){ say("The flashlight is dead. Find a battery.", 3, "n"); AU.click(); return; } fl = !fl; AU.click(); if(btnLight) btnLight.classList.toggle("on", fl); }
 
     /* ---------- helpers ---------- */
     const los = (ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, d = Math.hypot(dx, dz), n = Math.ceil(d*4); for(let i=1;i<n;i++) if(opaque(ax + dx*i/n, az + dz*i/n)) return false; return true; };
     const bfs = (sx, sy, tx, ty) => { const key = (x,y) => y*MW+x, prev = new Map([[key(sx,sy), null]]), q = [[sx,sy]];
       while(q.length){ const [x,y] = q.shift(); if(x === tx && y === ty) break;
-        for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+dx, ny = y+dy; if(nx<0||ny<0||nx>=MW||ny>=MH||grid[ny][nx] !== 0 || prev.has(key(nx,ny))) continue; prev.set(key(nx,ny), [x,y]); q.push([nx,ny]); } }
+        for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+dx, ny = y+dy; if(nx<0||ny<0||nx>=MW||ny>=MH||(grid[ny][nx] !== 0 && grid[ny][nx] !== 4) || prev.has(key(nx,ny))) continue; prev.set(key(nx,ny), [x,y]); q.push([nx,ny]); } }
       const path = []; let cur = [tx,ty]; if(!prev.has(key(tx,ty))) return []; while(cur){ path.unshift(cur); cur = prev.get(key(cur[0],cur[1])); } return path.slice(1); };
     const relAng = (x, z) => { const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), dx = x - P.x, dz = z - P.z; return Math.atan2(fx*dz - fz*dx, fx*dx + fz*dz); };   // + = to your right
     const nearDesk = () => desks.find(d => Math.hypot(d.x - P.x, d.z - P.z) < 1.9);
@@ -2584,20 +2685,55 @@ function floorOne(){
       if(d < 18) marks.push({ang, life:1, loud:Math.min(1, 2/(1 + d*.25)), kind:"crack"}); };
 
     /* ---------- actions ---------- */
+    const nearItem = () => items.filter(it => it.state === "rest" && (it.kind === "battery" || !P.held)).find(it => Math.hypot(it.mesh.position.x - P.x, it.mesh.position.z - P.z) < 1.35);
+    const nearLocker = () => lockers.find(l => Math.hypot(l.x - P.x, l.z - P.z) < 1.55);
     const context = () => {
       if(caught || done || paused) return null;
-      if(P.hidden) return "LEAVE THE DESK";
+      if(P.hidden) return P.hidden.kind === "locker" ? "LEAVE THE LOCKER" : "LEAVE THE DESK";
       if(!hasCard && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 2.2) return "TAKE THE KEYCARD";
+      if(breaker && hasCard && !powered && Math.hypot(breaker.x - P.x, breaker.z - P.z) < 1.9) return "FLIP THE BREAKER";
       if(Math.hypot(ex - 1 - P.x, ez - P.z) < 2.4 && !scripted.elevOpen && !scripted.elevCalled) return "CALL THE ELEVATOR";
+      const it = nearItem(); if(it) return it.kind === "battery" ? "TAKE THE BATTERY" : `PICK UP THE ${it.kind.toUpperCase()}`;
+      const dr = nearDoor(); if(dr) return dr.target ? "CLOSE THE DOOR" : "OPEN THE DOOR";
+      if(nearLocker()) return "HIDE IN THE LOCKER";
       if(nearDesk()) return "HIDE UNDER THE DESK";
       return null; };
+    const seenHiding = () => { const d = Math.hypot(C.x - P.x, C.z - P.z); return !["hidden", "script", "behind"].includes(C.mode) && d < 13 && los(C.x, C.z, P.x, P.z) && C.grace <= 0; };
     async function action(){
       const c = context(); if(!c) return; AU.click();
-      if(c === "HIDE UNDER THE DESK"){ const d = nearDesk(); P.hidden = d; P.px = P.x; P.pz = P.z; P.x = d.x + (P.x - d.x)*.25; P.z = d.z + (P.z - d.z)*.25; fl = false; if(btnLight) btnLight.classList.remove("on"); P.breath = 1; return; }
-      if(c === "LEAVE THE DESK"){ P.x = P.px; P.z = P.pz; P.hidden = null; return; }
+      if(c === "HIDE UNDER THE DESK"){ const d = nearDesk(); C.sawHide = seenHiding(); P.hidden = {kind:"desk", d}; P.px = P.x; P.pz = P.z; P.x = d.x + (P.x - d.x)*.25; P.z = d.z + (P.z - d.z)*.25; fl = false; if(btnLight) btnLight.classList.remove("on"); P.breath = 1;
+        if(C.sawHide) say("It saw you get under there.", 2.5, "n"); return; }
+      if(c === "HIDE IN THE LOCKER"){ const l = nearLocker(); C.sawHide = seenHiding(); P.hidden = {kind:"locker", l}; P.px = P.x; P.pz = P.z; P.x = l.x + l.face*.12; P.z = l.z; P.lockYaw = l.face > 0 ? -Math.PI/2 : Math.PI/2; P.tyaw = P.yaw = P.lockYaw; P.pitch = P.tpitch = 0;
+        fl = false; if(btnLight) btnLight.classList.remove("on"); P.breath = 1; AU.creak(); if(C.sawHide) say("It saw you get in.", 2.5, "n"); return; }
+      if(c === "LEAVE THE DESK" || c === "LEAVE THE LOCKER"){ if(P.hidden.kind === "locker") AU.creak(); P.x = P.px; P.z = P.pz; P.hidden = null; C.sawHide = false; return; }
       if(c === "TAKE THE KEYCARD") return takeCard();
+      if(c === "TAKE THE BATTERY"){ const it = nearItem(); it.state = "gone"; it.mesh.visible = false; P.bat = Math.min(1, P.bat + .6); scripted.batDead = false; AU.chord(); say("A battery. The flashlight is brighter.", 2.5, "n"); return; }
+      if(c.startsWith("PICK UP")){ const it = nearItem(); it.state = "held"; P.held = it; camera.add(it.mesh); it.mesh.position.set(-.27, -.3, -.62); it.mesh.rotation.set(.25, 0, .15); it.mesh.scale.setScalar(.75);
+        say(touch ? "Tap THROW to throw it. It will go to the noise." : "Press R (or right-click) to throw it. It will go to the noise.", 4, "n"); return; }
+      if(c === "OPEN THE DOOR" || c === "CLOSE THE DOOR"){ const d = nearDoor(); setDoor(d, c === "OPEN THE DOOR"); return; }
+      if(c === "FLIP THE BREAKER"){ powered = true; surge = 1.6; breaker.lever.rotation.x = -.9; breaker.led.material.color.set(0x2aff6a); AU.hit(); AU.thump(); setTimeout(() => AU.hum(), 300);
+        panel.material.color.set(0xffc82a); say("The whole floor comes on for a second. Then off. Everything heard that.", 5, "n");
+        setTimeout(() => { if(!live()) return; AU.stinger(); say("it's coming to the server room. go. now. — s.", 5); }, 1400);
+        C.mode = "hunt"; C.lastX = breaker.x; C.lastZ = breaker.z; C.grace = 1.2; C.path = []; if(Math.hypot(C.x - P.x, C.z - P.z) < 8){ C.x = 5; C.z = 27; }
+        setObj("The elevator has power. Get to it: end of the bottom corridor, on the right."); return; }
       if(c === "CALL THE ELEVATOR"){ if(!hasCard){ say("The panel is dead. A card reader blinks red: KEYCARD REQUIRED.", 4, "n"); AU.win98err(); return; }
+        if(!powered){ say("The card reader blinks green. Then nothing. NO POWER. The breaker is in the server room, middle of the bottom corridor.", 6, "n"); AU.win98err();
+          setObj("Turn the power on: the breaker is in the server room (door in the middle of the bottom corridor)."); return; }
         scripted.elevCalled = t; panel.material.color.set(0x2aff6a); AU.tone(880, "sine", .01, .1, .3); say("The elevator is coming up from the basement. It's slow.", 4, "n"); setObj("Survive until the elevator arrives."); }
+    }
+    function throwItem(){
+      if(!P.held || P.hidden || caught || paused) return; const it = P.held; P.held = null; scene.attach(it.mesh);
+      it.mesh.scale.setScalar(1); const dir = new T.Vector3(); camera.getWorldDirection(dir); it.v.copy(dir).multiplyScalar(9).add(new T.Vector3(0, 2.4, 0)); it.state = "flying"; it.spin = 8 + Math.random()*6; AU.swoosh(); }
+    function shatter(it){
+      it.state = "broken"; it.mesh.position.y = .03; it.mesh.rotation.set(Math.PI/2, Math.random()*6, 0); it.mesh.scale.set(1, .6, 1);
+      const x = it.mesh.position.x, z = it.mesh.position.z, d = Math.hypot(x - P.x, z - P.z), an = relAng(x, z);
+      if(AU.ok()){ const t0 = AU.ctx.currentTime, out = AU.pan(Math.max(-1, Math.min(1, Math.sin(an)))), gain = Math.min(.9, 3/(1 + d*.3));
+        for(let i=0;i<9;i++){ const n = AU.noise(.08), f = AU.ctx.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 2500 + i*500; const g = AU.ctx.createGain(), at = t0 + i*rnd(1,5)/100;
+          g.gain.setValueAtTime(gain*(1 - i/12), at); g.gain.exponentialRampToValueAtTime(.001, at + .09); n.connect(f); f.connect(g); g.connect(out); n.start(at); } }
+      marks.push({ang:an, life:1.4, loud:1, kind:"crash"});
+      // it goes to the noise, unless it is already chasing you
+      let gx = Math.floor(x/CELL), gz = Math.floor(z/CELL); if(!(grid[gz] && (grid[gz][gx] === 0 || grid[gz][gx] === 4))){ gx = Math.floor((x - it.v.x*.05)/CELL); gz = Math.floor((z - it.v.z*.05)/CELL); }
+      if(Math.hypot(C.x - x, C.z - z) < 22 && !["hunt", "script", "hidden", "behind"].includes(C.mode)){ C.mode = "investigate"; C.tgt = [gx, gz]; C.path = []; C.pt = 0; C.sawHide = false; crack(Math.hypot(C.x - P.x, C.z - P.z), relAng(C.x, C.z)); }
     }
 
     /* ---------- Marisol: taking the card, in the world ---------- */
@@ -2672,7 +2808,8 @@ function floorOne(){
       c.fillStyle = "#000"; c.fillRect(0, 0, w, h); await new Promise(r => setTimeout(r, 500)); ov.remove();
       await taking("it caught you on floor 9.");
       if(!live()) return;
-      P.x = checkpoint.x; P.z = checkpoint.z; P.yaw = checkpoint.yaw; P.pitch = 0; P.hidden = null; P.vx = P.vz = 0; P.cx = null; fl = true; if(btnLight) btnLight.classList.add("on");
+      P.x = checkpoint.x; P.z = checkpoint.z; P.yaw = checkpoint.yaw; P.pitch = 0; P.hidden = null; P.vx = P.vz = 0; P.cx = null; C.sawHide = false; C.doorT = 0; P.bat = Math.max(P.bat, .45);
+      if(P.held){ const it = P.held; P.held = null; scene.attach(it.mesh); it.mesh.position.copy(it.home); it.state = "rest"; } fl = true; if(btnLight) btnLight.classList.add("on");
       const far = WAY.slice().sort((a,b) => Math.hypot(b[0]-P.x, b[1]-P.z) - Math.hypot(a[0]-P.x, a[1]-P.z))[0];
       C.x = far[0]; C.z = far[1]; C.mode = hasCard ? "investigate" : "patrol"; C.tgt = hasCard ? [Math.floor(P.x/CELL), Math.floor(P.z/CELL)] : null; C.grace = 6; C.path = [];
       if(scripted.elevCalled && !scripted.elevOpen){ scripted.elevCalled = 0; scripted.elevSent = false; panel.material.color.set(0xff2a1a); drawInd("B2"); setObj("Get to the elevator and call it again."); }
@@ -2681,30 +2818,50 @@ function floorOne(){
 
     /* ---------- the creature's brain ---------- */
     function creature(dt){
-      if(C.grace > 0) C.grace -= dt;
-      const d = Math.hypot(C.x - P.x, C.z - P.z), see = los(C.x, C.z, P.x, P.z), ang = relAng(C.x, C.z);
+      if(C.grace > 0) C.grace -= dt; if(C.listenCD > 0) C.listenCD -= dt;
+      const d = Math.hypot(C.x - P.x, C.z - P.z), see = los(C.x, C.z, P.x, P.z), ang = relAng(C.x, C.z), speedP = Math.hypot(P.vx, P.vz);
       if(C.mode === "hidden"){ CR.visible = false; return; }
       CR.visible = true;
+      if(C.mode === "behind") return;                                   // it is standing right behind you. it does nothing. that is the point.
       if(C.mode === "script"){ C.x += 2.4*dt; C.yaw = -Math.PI/2; if(Math.random() < dt*2) crack(d, ang); C.step -= dt; if(C.step <= 0){ C.step = .6; footstep(d, ang, false); }
         if(C.x > 41.5){ C.mode = "patrol"; C.x = 39; C.z = 27; C.grace = 4; } return; }
-      if(C.grace <= 0 && !P.hidden){
+      if(C.grace <= 0 && !P.hidden && C.mode !== "check"){
         const inBeam = fl && Math.abs(ang) < .5 && Math.abs(P.pitch) < .7, sees = see && (d < (fl ? 15 : 3.6) || (inBeam && d < 22));
-        const moving = Math.abs(stick.x) + Math.abs(stick.y) > .15 || K.w || K.s || K.a || K.d || K.arrowup || K.arrowdown;
-        const hears = K.shift && P.stamina > 0 && moving && d < 18;
+        const hears = K.shift && P.stamina > 0 && speedP > 3.5 && d < 18;
         if(sees || hears){ if(C.mode !== "hunt"){ AU.shriek(); AU.duck(.25); crack(d, ang); } C.mode = "hunt"; C.lastX = P.x; C.lastZ = P.z; C.searchT = 0; } }
+      /* it saw where you hid. it is going there. */
+      if(P.hidden && C.sawHide && C.mode !== "check"){ C.mode = "check"; C.path = []; C.pt = 0; }
       if(P.hidden && C.mode === "hunt" && !(see && d < 1.6)){ C.mode = "search"; C.searchT = 0; }
+      /* sometimes it stops, and listens */
+      if((C.mode === "patrol" || C.mode === "investigate") && d < 16 && !(C.listenCD > 0) && Math.random() < dt*.09){ C.prev = C.mode; C.mode = "listen"; C.listenT = 0; C.listenCD = 14 + Math.random()*10; C.clickT = 0; }
       let target = null, sp = 1.8;
+      if(C.mode === "listen"){ sp = 0; C.listenT += dt; C.clickT -= dt;
+        if(C.clickT <= 0){ C.clickT = .09 + Math.random()*.08; if(AU.ok()){ const t0 = AU.ctx.currentTime, g = AU.ctx.createGain(), o = AU.ctx.createOscillator(); o.type = "square"; o.frequency.value = 1800 + Math.random()*900;
+            g.gain.setValueAtTime(Math.min(.25, 1.6/(1 + d*d*.04)), t0); g.gain.exponentialRampToValueAtTime(.001, t0 + .02); o.connect(g); g.connect(AU.pan(Math.max(-1, Math.min(1, Math.sin(ang))))); o.start(t0); o.stop(t0 + .03); }
+          if(Math.random() < .3) marks.push({ang, life:.7, loud:Math.min(1, 2/(1 + d*.2)), kind:"click"}); }
+        if(speedP > .5 && !P.hidden && d < 13){ AU.shriek(); AU.duck(.25); C.mode = "hunt"; C.lastX = P.x; C.lastZ = P.z; }
+        else if(C.listenT > 3.2){ C.mode = C.prev === "investigate" && C.tgt ? "investigate" : "patrol"; } }
       if(C.mode === "patrol"){ const w = WAY[C.wi]; target = [Math.floor(w[0]/CELL), Math.floor(w[1]/CELL)]; if(Math.hypot(w[0] - C.x, w[1] - C.z) < .6) C.wi = (C.wi + 1 + (Math.random() < .3 ? 2 : 0)) % WAY.length; }
       if(C.mode === "investigate"){ target = C.tgt; sp = 2.6; if(target && Math.floor(C.x/CELL) === target[0] && Math.floor(C.z/CELL) === target[1]){ C.mode = "search"; C.searchT = 0; } }
       if(C.mode === "hunt"){ target = [Math.floor(C.lastX/CELL), Math.floor(C.lastZ/CELL)]; sp = 4.3;
         if(see && !P.hidden){ C.lastX = P.x; C.lastZ = P.z; } else if(Math.floor(C.x/CELL) === target[0] && Math.floor(C.z/CELL) === target[1]){ C.mode = "search"; C.searchT = 0; } }
+      if(C.mode === "check"){ const hx = P.hidden ? (P.hidden.kind === "locker" ? P.hidden.l.x : P.px) : P.x, hz = P.hidden ? (P.hidden.kind === "locker" ? P.hidden.l.z : P.pz) : P.z;
+        target = [Math.floor(hx/CELL), Math.floor(hz/CELL)]; sp = 3.2; if(!P.hidden){ C.mode = "hunt"; C.lastX = P.x; C.lastZ = P.z; } }
       if(C.mode === "search"){ C.searchT += dt; sp = 0; if(Math.random() < dt*1.2) crack(d, ang); if(C.searchT > 5){ C.mode = "patrol"; } }
       if(target && sp){ C.pt -= dt; if(C.pt <= 0 || !C.path.length){ C.pt = .35; C.path = bfs(Math.floor(C.x/CELL), Math.floor(C.z/CELL), target[0], target[1]); }
-        let tx, tz; if(C.mode === "hunt" && see && !P.hidden && d < 3){ tx = P.x; tz = P.z; } else if(C.path.length){ tx = C.path[0][0]*CELL + 1; tz = C.path[0][1]*CELL + 1; }
+        let tx, tz, nextDoor = null;
+        if((C.mode === "hunt" || C.mode === "check") && d < 3 && (see || C.mode === "check")){ tx = P.x; tz = P.z; }
+        else if(C.path.length){ tx = C.path[0][0]*CELL + 1; tz = C.path[0][1]*CELL + 1; nextDoor = doorMap.get(C.path[0][1]*MW + C.path[0][0]); }
+        if(nextDoor && nextDoor.t < .85 && Math.hypot(nextDoor.cx - C.x, nextDoor.cz - C.z) < 2.2){                     // a closed door: it tries the handle, then it comes through
+          if(!C.doorT){ C.doorT = .001; AU.knock(Math.max(-1, Math.min(1, Math.sin(relAng(nextDoor.cx, nextDoor.cz)))), 2, true); marks.push({ang:relAng(nextDoor.cx, nextDoor.cz), life:1.2, loud:Math.min(1, 2.5/(1 + d*.2)), kind:"crash"}); }
+          C.doorT += dt; if(C.doorT > (C.mode === "hunt" ? .6 : 1.5)){ setDoor(nextDoor, true, "it"); C.doorT = 0; } tx = undefined; }
+        else C.doorT = 0;
         if(tx !== undefined){ const dx = tx - C.x, dz = tz - C.z, dd = Math.hypot(dx, dz); if(dd < .15){ if(C.path.length) C.path.shift(); } else { C.x += dx/dd*sp*dt; C.z += dz/dd*sp*dt; C.yaw = Math.atan2(dx, dz); } } }
-      C.step -= dt; if(C.step <= 0 && sp){ C.step = C.mode === "hunt" ? .28 : .62; footstep(d, ang, C.mode === "hunt"); }
+      C.step -= dt; if(C.step <= 0 && sp && !C.doorT){ C.step = C.mode === "hunt" ? .28 : C.mode === "check" ? .4 : .62; footstep(d, ang, C.mode === "hunt" || C.mode === "check"); }
       if(Math.random() < dt*.3) crack(d, ang);
-      if(d < 1.0 && !caught && (!P.hidden || C.mode === "hunt")) getCaught();
+      if(!caught && ((d < 1.0 && (!P.hidden || C.mode === "hunt")) || (P.hidden && C.mode === "check" && d < 1.7))){
+        if(P.hidden && P.hidden.kind === "locker"){ AU.hit(); setTimeout(() => {}, 0); }
+        getCaught(); }
     }
 
     /* ---------- the loop ---------- */
@@ -2736,7 +2893,17 @@ function floorOne(){
         if(!solid(P.x + vx + Math.sign(vx)*r, P.z) && !solid(P.x + vx + Math.sign(vx)*r, P.z + r*.7) && !solid(P.x + vx + Math.sign(vx)*r, P.z - r*.7)) P.x += vx;
         if(!solid(P.x, P.z + vz + Math.sign(vz)*r) && !solid(P.x + r*.7, P.z + vz + Math.sign(vz)*r) && !solid(P.x - r*.7, P.z + vz + Math.sign(vz)*r)) P.z += vz;
         const spdNow = Math.hypot(P.vx, P.vz); P.bob += dt*spdNow*2.5; stepT -= dt*spdNow/3.2; if(stepT <= 0){ stepT = running ? .3 : .5; AU.noiseAt(AU.ctx ? AU.ctx.currentTime : 0, .07, "lowpass", 360, running ? .14 : .05, .002, .06); } }
-      flickT -= dt; if(flickT <= 0){ flickT = .04 + Math.random()*.25; flick = Math.random() < .04 + TAKEN.letters.length*.04 ? .2 + Math.random()*.5 : 1; }
+      flickT -= dt; if(flickT <= 0){ flickT = .04 + Math.random()*.25; flick = Math.random() < .04 + TAKEN.letters.length*.04 + (P.bat < .25 ? .3 : 0) ? .2 + Math.random()*.5 : 1; }
+      /* the battery */
+      if(fl && !P.hidden){ P.bat = Math.max(0, P.bat - dt/95); if(P.bat <= 0){ fl = false; if(btnLight) btnLight.classList.remove("on"); if(!scripted.batDead){ scripted.batDead = true; AU.click(); say("The flashlight dies. There are spare batteries in this office.", 5, "n"); } } }
+      if(P.bat < .25 && P.bat > 0 && !scripted.batLow){ scripted.batLow = true; say("The flashlight is dimming. Find a battery.", 4, "n"); } if(P.bat >= .25) scripted.batLow = false;
+      /* doors swing */
+      for(const dr of doors){ if(dr.t !== dr.target){ dr.t += Math.sign(dr.target - dr.t)*dt*1.7; dr.t = Math.max(0, Math.min(1, dr.t)); dr.pivot.rotation.y = (dr.alongX ? -1 : 1)*1.45*(dr.t*dr.t*(3 - 2*dr.t)); } }
+      /* thrown things */
+      for(const it of items){ if(it.state !== "flying") continue; it.v.y -= 9.8*dt; const m = it.mesh, nx = m.position.x + it.v.x*dt, nz = m.position.z + it.v.z*dt; m.position.y += it.v.y*dt; m.rotation.x += it.spin*dt;
+        if(solid(nx, nz) || m.position.y <= .04){ shatter(it); continue; } m.position.x = nx; m.position.z = nz; }
+      /* in a locker you look out through the slits */
+      if(P.hidden && P.hidden.kind === "locker"){ P.tyaw = Math.max(P.lockYaw - .45, Math.min(P.lockYaw + .45, P.tyaw)); P.tpitch = Math.max(-.3, Math.min(.3, P.tpitch)); }
       creature(dt);
       /* scripted moments */
       if(!scripted.hint && t > 1.5){ scripted.hint = true; say(touch ? "Left thumb moves. Drag anywhere to look around. LIGHT turns the flashlight on and off. RUN is loud." : "WASD to move. Click and move the mouse to look. F: flashlight. Shift: run (it's loud). E: action.", 8, "n"); }
@@ -2747,8 +2914,27 @@ function floorOne(){
           "it sees the light before it sees you. if it gets close, turn the light off. — s.",
           "don't run unless you have to. it hears running. — s.",
           "if it's coming, get under a desk. when it's right next to you, hold your breath. — s.",
-          "listen. you'll hear it before you see it. the marks on the edge of your screen show where the sound came from. — s."];
+          "listen. you'll hear it before you see it. the marks on the edge of your screen show where the sound came from. — s.",
+          "when it clicks, it's listening. stand completely still until it stops. — s.",
+          "you can throw things. mugs, bottles. it goes to the noise. use that. — s.",
+          "close doors behind you. it can open them, but you'll hear it try. — s.",
+          "if it sees you hide, it knows where you are. hide where it can't see you go. — s."];
           say(lines[monitors.indexOf(m) % lines.length], 6); AU.notif(); } }
+      /* the monitor that shows you from behind */
+      if(!scripted.mirror && !hasCard && scripted.glimpse && mirrorDesk && !P.hidden && Math.hypot(mirrorDesk.x - P.x, mirrorDesk.z - P.z) < 3.4 && Math.abs(relAng(mirrorDesk.x, mirrorDesk.z - .13)) < .55 && (C.mode === "patrol" || C.mode === "hidden") && Math.hypot(C.x - P.x, C.z - P.z) > 8){
+        scripted.mirror = {t:0, prev:C.mode}; C.mode = "behind"; me.visible = true; mirrorDesk.screen.material.map = rt.texture; mirrorDesk.screen.material.color.set(0x9affb4); mirrorDesk.screen.material.needsUpdate = true; AU.duck(.6); AU.breath(true); }
+      if(scripted.mirror && scripted.mirror.t >= 0){ const Mi = scripted.mirror; Mi.t += dt; const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+        C.x = P.x - fx*1.15; C.z = P.z - fz*1.15; C.yaw = Math.atan2(P.x - C.x, P.z - C.z);
+        if(Mi.t > .4 && (Math.abs(relAng(C.x, C.z)) < 1.05 || Mi.t > 11 || Math.hypot(mirrorDesk.x - P.x, mirrorDesk.z - P.z) > 5)){
+          Mi.t = -1; me.visible = false; mirrorDesk.screen.material.map = mirrorDesk.offScreen ? null : screenMat.map; mirrorDesk.screen.material.color.set(mirrorDesk.offScreen ? 0x050607 : 0xffffff); mirrorDesk.screen.material.needsUpdate = true; AU.breath(false); AU.stinger(); flick = .05; flickT = .35;
+          const far = WAY.slice().sort((a,b) => Math.hypot(b[0]-P.x, b[1]-P.z) - Math.hypot(a[0]-P.x, a[1]-P.z))[0]; C.x = far[0]; C.z = far[1]; C.mode = "patrol"; C.grace = 3;
+          say("There's nothing behind you. There's nothing behind you now.", 4, "n"); } }
+      /* a desk phone rings. the caller is you. */
+      if(!scripted.phone2 && scripted.glimpse && !hasCard && Math.hypot(phoneAt.x - P.x, phoneAt.z - P.z) < 9 && Math.hypot(phoneAt.x - P.x, phoneAt.z - P.z) > 3){ scripted.phone2 = {ring:true, t:0}; drawLcd("> " + trueName().toUpperCase()); }
+      if(scripted.phone2 && scripted.phone2.ring){ const ph = scripted.phone2, pd = Math.hypot(phoneAt.x - P.x, phoneAt.z - P.z); ph.t -= dt;
+        if(ph.t <= 0){ ph.t = 1.1; if(AU.ok()){ const an = relAng(phoneAt.x, phoneAt.z); for(let i=0;i<2;i++) setTimeout(() => AU.tone(1320, "square", .005, Math.min(.12, .5/(1 + pd*.4)), .18), i*220); marks.push({ang:an, life:.8, loud:Math.min(1, 2/(1 + pd*.25)), kind:"click"}); } }
+        if(pd < 1.7){ ph.ring = false; drawLcd("CALL ENDED"); AU.duck(.8); setTimeout(() => { if(!live()) return; AU.whisper("i'm right behind you"); AU.knock(Math.sin(relAng(P.x + Math.sin(P.yaw)*2, P.z + Math.cos(P.yaw)*2)), 2, true);
+          marks.push({ang:Math.PI, life:1.4, loud:1, kind:"step"}); flick = .05; flickT = .4; }, 700); } }
       if(!scripted.printer && P.x > 34 && P.z < 8){ scripted.printer = true; AU.scrape(); say("A printer in the corner is printing. Every page has your name on it. The later pages are wet.", 5, "n"); }
       if(scripted.elevCalled && !scripted.elevOpen){ const left = 14 - (t - scripted.elevCalled);
         drawInd(["B2","B1","G","1","2","3","4","5","6","7","8","9"][Math.max(0, Math.min(11, Math.floor((14 - left)/14*11)))]);
@@ -2757,26 +2943,27 @@ function floorOne(){
         if(left <= 0){ scripted.elevOpen = true; grid[elev.gy][elev.gx] = 0; AU.chime(); inside.intensity = 1.8; setObj("Get in."); say("The doors open.", 3, "n"); } }
       if(scripted.elevOpen){ doorL.position.z = Math.max(ez - 1.4, doorL.position.z - dt*1.2); doorR.position.z = Math.min(ez + 1.4, doorR.position.z + dt*1.2); }
       if(scripted.elevOpen && P.x > ex + .4){ done = true; finish(); }
-      const d = Math.hypot(C.x - P.x, C.z - P.z), active = C.mode !== "script" && C.mode !== "hidden";
+      const d = Math.hypot(C.x - P.x, C.z - P.z), active = C.mode !== "script" && C.mode !== "hidden" && C.mode !== "behind";
+      btnThrow.style.display = P.held && !P.hidden ? "block" : "none";
       AU.heartbeat(active && d < 16 ? Math.round(60 + (16 - d)*6) : 0);
       if(active && d < 4.5) AU.breath(true); else if(d > 7) AU.breath(false);
       if(P.hidden){
         const close = active && d < 2.8; btnBreath.style.display = close || P.holding ? "block" : "none";
-        if(P.holding){ P.breath -= dt/5; if(P.breath <= 0){ P.holding = false; P.breath = 0; AU.tone(300, "sawtooth", .01, .12, .3, 0); say("You gasp.", 2, "n"); C.mode = "hunt"; C.lastX = P.x; C.lastZ = P.z; P.x = P.px; P.z = P.pz; P.hidden = null; } }
-        else { P.breath = Math.min(1, P.breath + dt/3); if(close && heardT <= 0){ heardT = 1.2; if(Math.random() < .55){ say("It heard you breathing.", 2, "n"); C.mode = "hunt"; C.lastX = P.x; C.lastZ = P.z; P.x = P.px; P.z = P.pz; P.hidden = null; } } }
+        if(P.holding){ P.breath -= dt/5; if(P.breath <= 0){ P.holding = false; P.breath = 0; AU.tone(300, "sawtooth", .01, .12, .3, 0); say("You gasp.", 2, "n"); C.sawHide = true; } }
+        else { P.breath = Math.min(1, P.breath + dt/3); if(close && heardT <= 0 && C.mode !== "behind"){ heardT = 1.2; if(Math.random() < .55){ say("It heard you breathing.", 2, "n"); C.sawHide = true; } } }
         heardT -= dt;
       } else btnBreath.style.display = "none";
       const label = context(); btnAct.style.display = label ? "block" : "none"; btnAct.textContent = label || "";
     }
     function draw(dt, time){
-      const eyeH = P.hidden ? .55 : 1.62 + Math.sin(P.bob)*.025;
+      const eyeH = P.hidden ? (P.hidden.kind === "locker" ? 1.55 : .55) : 1.62 + Math.sin(P.bob)*.025;
       if(P.cx === null || Math.hypot(P.cx - P.x, P.cz - P.z) > 3){ P.cx = P.x; P.cz = P.z; }
       const k = Math.min(1, dt*10); P.cx += (P.x - P.cx)*k; P.cz += (P.z - P.cz)*k; P.cy += (eyeH - P.cy)*Math.min(1, dt*(P.hidden ? 5 : 12));   // crouching under a desk is a movement, not a cut
-      if(!CS){ camera.position.set(P.cx, P.cy, P.cz); camera.rotation.set(P.hidden ? Math.max(-.5, Math.min(.35, P.pitch)) : P.pitch, P.yaw, 0, "YXZ"); }
+      if(!CS){ camera.position.set(P.cx, P.cy, P.cz); camera.rotation.set(P.hidden && P.hidden.kind === "desk" ? Math.max(-.5, Math.min(.35, P.pitch)) : P.pitch, P.yaw, 0, "YXZ"); }
       hand.visible = !CS || CS.phase === "in" || CS.phase === "out";
       hand.position.set(.26 + Math.cos(P.bob*.5)*.012 + P.sway, -.3 + Math.abs(Math.sin(P.bob*.5))*.014 - (P.hidden ? .1 : 0), -.5); hand.rotation.z = P.sway*2;
       dust.visible = fl && !P.hidden; { const pa = dust.geometry.attributes.position; for(let i=0;i<dustN;i++){ pa.array[i*3+1] += Math.sin(time*.3 + i)*.0006 - .0002; if(pa.array[i*3+1] < -.8) pa.array[i*3+1] = .8; } pa.needsUpdate = true; }
-      const on = fl && !P.hidden; flash.intensity = on ? 1.6*flick : 0; lens.material.color.set(on ? 0xfff2d0 : 0x222222);
+      const on = fl && !P.hidden; flash.intensity = on ? 1.6*flick*(P.bat < .25 ? .35 + P.bat*2.6 : 1) : 0; lens.material.color.set(on ? 0xfff2d0 : 0x222222);
       drips.forEach((dd, i) => { const k = ((time*.3 + i*.33) % 1); dd.scale.y = .02 + k*.2; dd.position.y = -.06 - k*.1; });
       updateHand();
       /* the creature in the world */
@@ -2785,9 +2972,14 @@ function floorOne(){
       CR.updateMatrixWorld(true); face.lookAt(camera.getWorldPosition(tmp));   // its face always turns to you
       eyes.forEach(e => e.visible = C.mode !== "hidden" && (C.mode === "hunt" || d < 18));
       /* lights stutter when it is near them */
-      for(const L of LIGHTS){ const ld = Math.hypot(L.position.x - C.x, L.position.z - C.z); L.intensity = L.base*(ld < 6 && Math.random() < .3 ? Math.random()*.3 : (Math.sin(time*13 + L.position.x) > -.85 ? 1 : .3));
+      if(surge > 0) surge -= dt; hemi.intensity = surge > 0 ? .22 + surge*.5 : .22;
+      racks.forEach((r, i) => { r.material.emissiveIntensity = .4 + (Math.sin(time*7 + i*2) > .6 ? .4 : 0); });
+      for(const L of LIGHTS){ const ld = Math.hypot(L.position.x - C.x, L.position.z - C.z); L.intensity = surge > 0 ? L.base*3 : L.base*(ld < 6 && Math.random() < .3 ? Math.random()*.3 : (Math.sin(time*13 + L.position.x) > -.85 ? 1 : .3));
         if(L.panel) L.panel.material.emissiveIntensity = .8*L.intensity/L.base; }
       for(const m of monitors){ if(m.screen){ const md2 = Math.hypot(m.x - C.x, m.z - C.z); m.screen.material.color.setScalar(md2 < 5 && Math.random() < .35 ? .05 : 1); } }
+      if(scripted.mirror && scripted.mirror.t >= 0){ const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw); me.position.set(P.x, 0, P.z); me.rotation.y = P.yaw;
+        camB.position.set(P.x + fx*2.3, 2.45, P.z + fz*2.3); camB.lookAt(P.x - fx*.5, 1.45, P.z - fz*.5); face.lookAt(camB.position); irLight.position.copy(camB.position); irLight.intensity = 2.6; const fI = flash.intensity; flash.intensity = 0; const fogD = scene.fog.density; scene.fog.density = .03;
+        renderer.setRenderTarget(rt); renderer.render(scene, camB); renderer.setRenderTarget(null); irLight.intensity = 0; face.lookAt(camera.getWorldPosition(tmp)); flash.intensity = fI; scene.fog.density = fogD; }
       renderer.render(scene, camera);
       drawHud(dt, d);
     }
@@ -2799,12 +2991,18 @@ function floorOne(){
       /* where the sounds came from */
       for(let i=marks.length-1;i>=0;i--){ const m = marks[i]; m.life -= dt*.9; if(m.life <= 0){ marks.splice(i, 1); continue; }
         const a = m.ang - Math.PI/2, rx = W*.42, ry = H*.4, x = W/2 + Math.cos(a)*rx, y = H/2 + Math.sin(a)*ry, al = m.life*m.loud;
-        c.save(); c.translate(x, y); c.rotate(a + Math.PI/2); c.strokeStyle = m.kind === "crack" ? `rgba(255,190,190,${al*.8})` : `rgba(255,60,80,${al})`; c.lineWidth = 3 + m.loud*5; c.lineCap = "round";
+        c.save(); c.translate(x, y); c.rotate(a + Math.PI/2); c.strokeStyle = m.kind === "crack" ? `rgba(255,190,190,${al*.8})` : m.kind === "crash" ? `rgba(255,220,120,${al})` : m.kind === "click" ? `rgba(200,160,255,${al})` : `rgba(255,60,80,${al})`; c.lineWidth = 3 + m.loud*5; c.lineCap = "round";
         c.beginPath(); c.arc(0, 30, 34, -Math.PI*.5 - .35, -Math.PI*.5 + .35); c.stroke(); c.restore(); }
       /* objective, name, stamina, breath, elevator, subtitles */
       c.font = "600 13px ui-monospace,Menlo,monospace"; c.textAlign = "left"; const obj = W < 700 && objective.length > 60 ? objective.slice(0, 58) + "…" : objective;
       c.fillStyle = "rgba(0,0,0,.5)"; c.fillRect(14, 14, Math.min(W - 40, c.measureText(obj).width + 24), 30); c.fillStyle = "#e9e2d8"; c.fillText(obj, 26, 34);
       c.textAlign = "right"; c.fillStyle = "#cfc6c0"; c.fillText(fullName().toUpperCase(), W - 18, 34);
+      if(P.hidden && P.hidden.kind === "locker"){ c.fillStyle = "rgba(3,3,4,.97)"; let y = 0; const gap = Math.max(10, H*.03); c.fillRect(0, 0, W, H*.32); c.fillRect(0, H*.68, W, H*.32);
+        for(y = H*.32; y < H*.68; y += gap*2.2) c.fillRect(0, y + gap, W, gap*1.2); c.fillRect(0, 0, W*.12, H); c.fillRect(W*.88, 0, W*.12, H); }
+      if(C.mode === "listen" && d < 16){ c.textAlign = "center"; c.fillStyle = `rgba(255,120,130,${.5 + Math.random()*.4})`; c.font = "600 13px ui-monospace,monospace"; c.fillText("· click · click · click ·", W/2, 70); }
+      c.textAlign = "left"; c.font = "600 11px ui-monospace,monospace"; c.fillStyle = "rgba(0,0,0,.5)"; c.fillRect(14, 50, 150, 18);
+      c.fillStyle = P.bat < .25 ? "#ff5e7a" : "#cfc6c0"; c.fillText("LIGHT", 20, 63); c.fillStyle = "rgba(255,255,255,.15)"; c.fillRect(62, 55, 94, 8); c.fillStyle = P.bat < .25 ? "#ff2d55" : "#e9d79a"; c.fillRect(62, 55, 94*P.bat, 8);
+      if(P.held){ c.fillStyle = "rgba(0,0,0,.5)"; c.fillRect(14, 72, 200, 18); c.fillStyle = "#ffe9a8"; c.fillText(`HOLDING: ${P.held.kind.toUpperCase()}${touch ? "" : "  (R to throw)"}`, 20, 85); }
       if(P.stamina < .98){ c.fillStyle = "rgba(255,255,255,.12)"; c.fillRect(W/2 - 60, H - 14, 120, 4); c.fillStyle = "rgba(255,255,255,.55)"; c.fillRect(W/2 - 60, H - 14, 120*P.stamina, 4); }
       if(P.hidden){ c.fillStyle = "rgba(255,45,85,.25)"; c.fillRect(W/2 - 100, H - 130, 200, 6); c.fillStyle = "#ff2d55"; c.fillRect(W/2 - 100, H - 130, 200*P.breath, 6);
         c.textAlign = "center"; c.fillStyle = "#ffd2d8"; c.font = "600 12px ui-monospace,monospace"; c.fillText(touch ? "BREATH" : "BREATH — hold SPACE when it's close", W/2, H - 138); }
@@ -2828,7 +3026,7 @@ function floorOne(){
       try{ document.exitPointerLock && document.exitPointerLock(); }catch(e){}
       ui.remove(); hud.remove(); renderer.dispose(); cv.remove(); AU.breath(false); AU.heartbeat(0); document.body.classList.remove("floor");
     }
-    DEV.f1 = { P, C, stick, action: () => action(), caught: () => getCaught(), get t(){ return t; }, get hasCard(){ return hasCard; }, get objective(){ return objective; }, get CS(){ return CS; }, renderer };   // test hook
+    DEV.f1 = { P, C, stick, action: () => action(), caught: () => getCaught(), get t(){ return t; }, get hasCard(){ return hasCard; }, get objective(){ return objective; }, get CS(){ return CS; }, renderer, doors, items, lockers, scripted, get powered(){ return powered; }, throwItem: () => throwItem(), get breaker(){ return breaker; }, mirrorDesk, phoneAt };   // test hook
     requestAnimationFrame(frame);
   });
 }
