@@ -2206,9 +2206,9 @@ async function layerFour(){
 
 
 /* ================================================================
-   SECTION 1 — FLOOR 9. the Nimbus office at night, first person.
-   It is on the floor with you the whole time. It sees light, it hears
-   running. Get Marisol's keycard and reach the elevator.
+   SECTION 1 — FLOOR 9, in real 3D (three.js, loaded when needed).
+   The Nimbus office at night. It is on the floor with you the whole
+   time. It sees light and hears running. You can hear where it is.
    ================================================================ */
 const F1MAP = [
   "######################",
@@ -2228,147 +2228,260 @@ const F1MAP = [
   "#..d.......d........E#",
   "######################"
 ];
+const THREE_URL = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+function loadThree(){
+  if(window.THREE) return Promise.resolve(true);
+  return new Promise(res => { const s = document.createElement("script"); s.src = THREE_URL; s.onload = () => res(true); s.onerror = () => res(false); document.head.appendChild(s); });
+}
 
-/* ---------- small procedural textures (64x64), stored as RGB channel arrays ---------- */
-const F1TEX = {
-  make(w, h, fn){ const r = new Uint8Array(w*h), g = new Uint8Array(w*h), b = new Uint8Array(w*h);
-    for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const [R,G,B] = fn(x,y); const i = y*w+x; r[i] = R; g[i] = G; b[i] = B; } return {w, h, r, g, b}; },
-  noise(x, y, s=1){ const v = Math.sin(x*127.1*s + y*311.7) * 43758.5453; return v - Math.floor(v); },
+/* canvas textures, drawn once */
+const F1ART = {
+  canvas(w, h, fn){ const cv = document.createElement("canvas"); cv.width = w; cv.height = h; fn(cv.getContext("2d"), w, h); return cv; },
+  noise(c, w, h, n, a){ for(let i=0;i<n;i++){ c.fillStyle = `rgba(${Math.random() < .5 ? "0,0,0" : "255,255,255"},${Math.random()*a})`; c.fillRect(Math.random()*w, Math.random()*h, 1 + Math.random()*3, 1 + Math.random()*3); } },
   init(){
     if(this.wall) return;
-    const N = (x,y,s) => this.noise(x,y,s);
-    this.wall = this.make(64, 64, (x, y) => {                        // stained drywall, panel seams, baseboard
-      let v = 118 + N(x,y)*22 - (x % 32 === 0 ? 30 : 0); if(y > 56) v = 60 + N(x,y)*10;
-      const drip = (x*7 % 23 < 2) && y < (x*13 % 40) + 10 ? 28 : 0;
-      return [v - drip*.6, v*.94 - drip*.8, v*.8 - drip]; });
-    this.wallBlood = this.make(64, 64, (x, y) => {                   // same wall, with handprints dragged down it
-      let [r,g,b] = [118 + N(x,y)*22, (118 + N(x,y)*22)*.94, (118 + N(x,y)*22)*.8]; if(y > 56){ r = g = b = 62; }
-      for(const [hx, hy] of [[18, 20], [40, 30]]){ const dx = x - hx, dy = y - hy;
-        const palm = dx*dx/30 + dy*dy/45 < 1, fingers = dy < -5 && dy > -16 && Math.abs((dx + 6) % 4) < 1.6 && dx > -6 && dx < 6, smear = Math.abs(dx) < 5 && dy > 0 && dy < 26 + (hx % 7);
-        if(palm || fingers){ r = 92 + N(x,y)*20; g = 8; b = 10; } else if(smear && N(x,y) > .35){ r = r*.55 + 30; g *= .3; b *= .3; } }
-      return [r, g, b]; });
-    this.door = this.make(64, 64, (x, y) => { let v = 120 + Math.sin(x*.4)*6 + N(x,y)*8; if(Math.abs(x - 32) < 1) v = 40; if(y < 4 || y > 60) v = 70; return [v*.9, v*.95, v]; });
-    this.carpet = this.make(64, 64, (x, y) => { const v = 34 + N(x,y)*26 + ((x ^ y) & 4 ? 4 : 0); return [v*.85, v*.9, v*1.1]; });
-    this.ceil = this.make(64, 64, (x, y) => { let v = 74 + N(x,y)*10; if(x % 32 < 1 || y % 32 < 1) v = 40; return [v, v, v*.98]; });
+    this.wall = this.canvas(256, 256, (c, w, h) => { c.fillStyle = "#8c8272"; c.fillRect(0, 0, w, h); this.noise(c, w, h, 9000, .09);
+      const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "rgba(0,0,0,.25)"); g.addColorStop(.6, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(30,20,10,.35)"); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      c.fillStyle = "rgba(0,0,0,.25)"; c.fillRect(127, 0, 2, h); c.fillStyle = "#3a352e"; c.fillRect(0, h - 22, w, 22);
+      for(let i=0;i<14;i++){ const x = Math.random()*w, l = 20 + Math.random()*120; c.fillStyle = `rgba(60,40,20,${.08 + Math.random()*.15})`; c.fillRect(x, 0, 1 + Math.random()*2, l); } });
+    this.wallBlood = this.canvas(256, 256, (c, w, h) => { c.drawImage(this.wall, 0, 0);
+      for(const [hx, hy] of [[70, 90], [160, 120]]){ c.fillStyle = "rgba(70,4,8,.9)"; c.beginPath(); c.ellipse(hx, hy, 18, 24, 0, 0, 7); c.fill();
+        for(let f=0;f<4;f++){ c.beginPath(); c.ellipse(hx - 14 + f*9, hy - 30, 4, 12, (f - 1.5)*.12, 0, 7); c.fill(); }
+        c.fillStyle = "rgba(60,3,6,.7)"; for(let k=0;k<5;k++) c.fillRect(hx - 12 + k*6, hy + 18, 3 + Math.random()*3, 40 + Math.random()*80); } });
+    this.carpet = this.canvas(256, 256, (c, w, h) => { c.fillStyle = "#2a2e36"; c.fillRect(0, 0, w, h); this.noise(c, w, h, 20000, .12);
+      c.strokeStyle = "rgba(0,0,0,.25)"; for(let i=0;i<=w;i+=64){ c.beginPath(); c.moveTo(i, 0); c.lineTo(i, h); c.stroke(); c.beginPath(); c.moveTo(0, i); c.lineTo(w, i); c.stroke(); } });
+    this.ceil = this.canvas(256, 256, (c, w, h) => { c.fillStyle = "#6c6b68"; c.fillRect(0, 0, w, h); this.noise(c, w, h, 8000, .1); c.fillStyle = "#2c2b29";
+      for(let i=0;i<=w;i+=128){ c.fillRect(i, 0, 4, h); c.fillRect(0, i, w, 4); } c.fillStyle = "rgba(60,40,20,.35)"; c.beginPath(); c.ellipse(190, 70, 40, 26, .3, 0, 7); c.fill(); });
+    this.blood = this.canvas(256, 256, (c, w, h) => { c.fillStyle = "rgba(55,2,6,.95)";
+      for(let i=0;i<26;i++){ const a = Math.random()*6.28, r = Math.random()*70; c.beginPath(); c.ellipse(128 + Math.cos(a)*r, 128 + Math.sin(a)*r, 10 + Math.random()*40, 8 + Math.random()*26, a, 0, 7); c.fill(); }
+      c.fillStyle = "rgba(90,6,12,.6)"; for(let i=0;i<40;i++){ c.beginPath(); c.arc(Math.random()*w, Math.random()*h, 1 + Math.random()*4, 0, 7); c.fill(); } });
+    this.drag = this.canvas(512, 128, (c, w, h) => { for(let i=0;i<3;i++){ c.strokeStyle = `rgba(60,3,6,${.5 + i*.15})`; c.lineWidth = 6 + i*4; c.lineCap = "round";
+      c.beginPath(); c.moveTo(10, 40 + i*20); c.bezierCurveTo(150, 30 + i*24, 300, 70 + i*10, 500, 50 + i*22); c.stroke(); } });
+    this.face = this.canvas(256, 320, (c, w, h) => { CREATURE.head(c, w/2, h*.5, h*.92, {lit:.85, grin:.85, tilt:0, detail:true, eyes:false}); });
+    this.faceOpen = this.canvas(256, 320, (c, w, h) => { CREATURE.head(c, w/2, h*.5, h*.92, {lit:.9, grin:1, tilt:0, detail:true, eyes:false}); });
+    this.marisolFace = this.canvas(128, 160, (c, w, h) => { CREATURE.head(c, w/2, h*.5, h*.9, {lit:.55, grin:0, tilt:0, detail:true, eyes:false});
+      c.fillStyle = "rgba(80,0,8,.7)"; c.fillRect(w*.22, h*.36, w*.56, h*.1); });
+    this.screen = this.canvas(128, 80, (c, w, h) => { c.fillStyle = "#0d2a1c"; c.fillRect(0, 0, w, h); c.fillStyle = "#7dffb0"; for(let i=0;i<6;i++) c.fillRect(8, 10 + i*10, 30 + (i*37 % 70), 3); });
+    this.exit = this.canvas(128, 48, (c, w, h) => { c.fillStyle = "#300"; c.fillRect(0, 0, w, h); c.fillStyle = "#ff3a2a"; c.font = "bold 30px sans-serif"; c.textAlign = "center"; c.fillText("EXIT", w/2, 35); });
   }
 };
 
-/* ---------- sprites: drawn once with canvas, then sampled by the renderer ---------- */
-const F1SPR = {
-  grab(cv){ const c = cv.getContext("2d"), d = c.getImageData(0, 0, cv.width, cv.height).data, n = cv.width*cv.height;
-    const r = new Uint8Array(n), g = new Uint8Array(n), b = new Uint8Array(n), a = new Uint8Array(n);
-    for(let i=0;i<n;i++){ r[i] = d[i*4]; g[i] = d[i*4+1]; b[i] = d[i*4+2]; a[i] = d[i*4+3]; } return {w:cv.width, h:cv.height, r, g, b, a}; },
-  canvas(w, h, fn){ const cv = document.createElement("canvas"); cv.width = w; cv.height = h; fn(cv.getContext("2d"), w, h); return this.grab(cv); },
-  init(){
-    if(this.desk) return;
-    this.desk = this.canvas(96, 64, (c, w, h) => {                    // office desk with a dead monitor
-      c.fillStyle = "#2b2622"; c.fillRect(4, 26, w-8, 7); c.fillStyle = "#1b1815"; c.fillRect(8, 33, 6, h-33); c.fillRect(w-14, 33, 6, h-33); c.fillRect(10, 33, w-20, 14);
-      c.fillStyle = "#151515"; c.fillRect(30, 4, 36, 22); c.fillStyle = "#050607"; c.fillRect(33, 7, 30, 16); c.fillStyle = "#222"; c.fillRect(44, 26, 8, 2); });
-    this.deskOn = this.canvas(96, 64, (c, w, h) => {                  // same desk, monitor on
-      c.fillStyle = "#2b2622"; c.fillRect(4, 26, w-8, 7); c.fillStyle = "#1b1815"; c.fillRect(8, 33, 6, h-33); c.fillRect(w-14, 33, 6, h-33); c.fillRect(10, 33, w-20, 14);
-      c.fillStyle = "#151515"; c.fillRect(30, 4, 36, 22); c.fillStyle = "#1e5a3a"; c.fillRect(33, 7, 30, 16); c.fillStyle = "#7dffb0"; for(let i=0;i<4;i++) c.fillRect(35, 9 + i*3, 10 + (i*7 % 16), 1); });
-    this.plant = this.canvas(48, 96, (c, w, h) => { c.fillStyle = "#2a1d14"; c.fillRect(14, h-22, 20, 22); c.strokeStyle = "#1c2a1a"; c.lineWidth = 3;
-      for(let i=0;i<9;i++){ c.beginPath(); c.moveTo(24, h-22); c.quadraticCurveTo(24 + (i-4)*6, h-60, 24 + (i-4)*10, h-80 + (i%3)*8); c.stroke(); } });
-    this.blood = this.canvas(64, 16, (c, w, h) => { c.fillStyle = "#4a0306"; c.beginPath(); c.ellipse(32, 9, 28, 6, 0, 0, 7); c.fill(); c.fillStyle = "#6a0509";
-      c.beginPath(); c.ellipse(24, 8, 12, 3, .2, 0, 7); c.fill(); for(let i=0;i<8;i++){ c.beginPath(); c.arc(4 + i*8, 4 + (i*5 % 9), 1.5, 0, 7); c.fill(); } });
-    this.marisol = this.canvas(96, 128, (c, w, h) => {                // seated at her desk, head down, the phone grown into her hand
-      c.fillStyle = "#3a0306"; c.beginPath(); c.ellipse(48, h-6, 44, 7, 0, 0, 7); c.fill();                   // what has soaked into the carpet
-      c.fillStyle = "#1d1916"; c.fillRect(2, 70, w-4, 7); c.fillRect(6, 77, 6, 50); c.fillRect(w-12, 77, 6, 50);
-      c.fillStyle = "#242018"; c.fillRect(30, 92, 34, 6); c.fillRect(34, 98, 4, 28); c.fillRect(56, 98, 4, 28);  // chair
-      c.fillStyle = "#3d3a44"; c.beginPath(); c.moveTo(32, 94); c.quadraticCurveTo(30, 60, 40, 46); c.lineTo(58, 46); c.quadraticCurveTo(66, 60, 62, 94); c.fill();  // cardigan
-      c.fillStyle = "#b5a594"; c.beginPath(); c.ellipse(46, 40, 9, 11, .25, 0, 7); c.fill();                    // head, bowed
-      c.fillStyle = "#0d0a09"; c.beginPath(); c.ellipse(46, 36, 11, 12, .25, 0, 7); c.fill(); c.fillRect(37, 36, 18, 22);   // hair hanging forward
-      c.strokeStyle = "#3d3a44"; c.lineWidth = 7; c.lineCap = "round"; c.beginPath(); c.moveTo(58, 52); c.lineTo(66, 40); c.lineTo(58, 32); c.stroke();  // arm up to the ear
-      c.fillStyle = "#c9b8a6"; c.beginPath(); c.ellipse(57, 31, 5, 4, 0, 0, 7); c.fill();
-      c.fillStyle = "#e9e2d0"; c.fillRect(50, 24, 12, 5);                                                          // the receiver
-      c.fillStyle = "#7a0a10"; c.beginPath(); c.ellipse(57, 29, 6, 3, 0, 0, 7); c.fill();                          // where they meet
-      c.strokeStyle = "#e9e2d0"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(56, 29); c.bezierCurveTo(70, 50, 30, 60, 22, 70); c.stroke();   // the cord, to the desk phone
-      c.fillStyle = "#e9e2d0"; c.fillRect(14, 64, 16, 6);
-      c.fillStyle = "#5a0408"; for(let i=0;i<5;i++) c.fillRect(58 + i, 33 + i*4, 1.4, 10 + i*5);                   // running down the sleeve
-    });
-    this.creature = [0, 1, 2, 3].map(f => {                           // walk A, walk B, searching, lunge
-      const cv = document.createElement("canvas"); cv.width = 96; cv.height = 256; const c = cv.getContext("2d");
-      CREATURE.draw(c, 48, 252, 236, {lit: 1, grin: f === 3 ? 1 : .55, tilt: [.3, .42, .95, .1][f], reach: [0, .15, .5, 1][f], t: 7 + f});
-      // what it is made of: faces pushing out through the chest and belly, and everything it drags
-      for(const [fx, fy, s] of [[44, 120, 7], [53, 146, 6], [41, 160, 5]]){
-        c.fillStyle = "#4a0a0e"; c.beginPath(); c.ellipse(fx, fy, s+2, s*1.3+2, 0, 0, 7); c.fill();
-        c.fillStyle = "#c8b8a8"; c.beginPath(); c.ellipse(fx, fy, s, s*1.3, 0, 0, 7); c.fill();
-        c.fillStyle = "#000"; c.fillRect(fx - s*.5, fy - s*.3, s*.35, s*.35); c.fillRect(fx + s*.15, fy - s*.3, s*.35, s*.35); c.beginPath(); c.ellipse(fx, fy + s*.5, s*.3, s*.45, 0, 0, 7); c.fill();
-        c.fillStyle = "#6a0509"; c.fillRect(fx - 1, fy + s*1.3, 2, 14 + s*2); }
-      c.fillStyle = "#5a0408"; for(let i=0;i<12;i++) c.fillRect(30 + (i*13 % 36), 170 + (i*29 % 70), 1.5, 8 + (i*7 % 20));
-      return this.grab(cv); });
-    this.card = this.canvas(16, 16, (c) => { c.fillStyle = "#e6e2d6"; c.fillRect(3, 5, 10, 7); c.fillStyle = "#39d6ff"; c.fillRect(4, 6, 3, 2); c.fillStyle = "#7a0a10"; c.fillRect(3, 10, 10, 2); });
-  }
-};
-
-function floorOne(opts={}){
-  return new Promise(resolve => {
+function floorOne(){
+  return new Promise(async resolve => {
     const live = newLayer();
-    F1TEX.init(); F1SPR.init();
     state.layer = 10; state.act = 2; DREAD.install(); SHADOW.off(); NAMEBAR.hide(); RULES.hide(); SCARE.atmosphere(false);
-    render(""); document.body.className = "floor"; document.body.style.background = "#000"; tab("Nimbus — floor 9", "🔦");
+    render(`<div style="min-height:100vh;display:grid;place-content:center;font-family:var(--mono);color:#7dffb0;letter-spacing:.2em">LOADING FLOOR 9…</div>`);
+    document.body.className = "floor"; document.body.style.background = "#000"; tab("Nimbus — floor 9", "🔦");
+    const ok = await loadThree();
+    if(!live()) return;
+    if(!ok){ render(`<div style="min-height:100vh;display:grid;place-content:center;text-align:center;font-family:var(--mono);color:#ff5e7a;padding:20px">Floor 9 needs an internet connection to load its 3D engine.<br><br><button class="btn" id="f1retry" style="max-width:220px">Try again</button></div>`);
+      document.getElementById("f1retry").onclick = () => floorOne().then(resolve); return; }
+    render(""); F1ART.init();
     AU.stopAll(); AU.floor(true); AU.drone(true); AU.ambience(true);
+    const T = THREE, CELL = 2, WH = 3;
 
-    /* ---------- the map ---------- */
-    const MW = F1MAP[0].length, MH = F1MAP.length, grid = [], sprites = [], monitors = [];
-    let start = {x:1.5, y:1.5}, marisolAt = null, elev = null;
+    /* ---------- renderer, scene, camera ---------- */
+    const cv = document.createElement("canvas"); cv.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;z-index:79;display:block;touch-action:none"; document.body.appendChild(cv);
+    const renderer = new T.WebGLRenderer({canvas:cv, antialias:true, powerPreference:"high-performance"});
+    renderer.setPixelRatio(Math.min(1.5, devicePixelRatio || 1)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+    renderer.outputEncoding = T.sRGBEncoding; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = .9;
+    const scene = new T.Scene(); scene.background = new T.Color(0x020203); scene.fog = new T.FogExp2(0x020203, .085);
+    const camera = new T.PerspectiveCamera(72, innerWidth/innerHeight, .05, 60); camera.rotation.order = "YXZ"; scene.add(camera);
+    const hud = document.createElement("canvas"); hud.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;z-index:80;pointer-events:none"; document.body.appendChild(hud);
+    const hc = hud.getContext("2d"); let W = 0, H = 0;
+    const fit = () => { W = innerWidth; H = innerHeight; renderer.setSize(W, H, false); camera.aspect = W/H; camera.updateProjectionMatrix();
+      const d = Math.min(2, devicePixelRatio || 1); hud.width = W*d; hud.height = H*d; hc.setTransform(d,0,0,d,0,0); };
+    fit(); addEventListener("resize", fit);
+    const tex = (cv2, rx=1, ry=1) => { const t = new T.CanvasTexture(cv2); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(rx, ry); t.encoding = T.sRGBEncoding; t.anisotropy = 4; return t; };
+
+    /* ---------- the floor plan ---------- */
+    const MW = F1MAP[0].length, MH = F1MAP.length, grid = [], desks = [], monitors = [];
+    let start = {x:1, z:1}, marisolAt = null, elev = null;
     for(let y=0;y<MH;y++){ grid.push([]); for(let x=0;x<MW;x++){ const ch = F1MAP[y][x];
       grid[y].push(ch === "#" ? 1 : ch === "E" ? 2 : (ch === "d" || ch === "k" || ch === "m" || ch === "p") ? 3 : 0);
-      if(ch === "S") start = {x:x+.5, y:y+.5};
-      if(ch === "d" || ch === "k"){ const on = ch === "k" || (x*7 + y*3) % 4 === 0; sprites.push({x:x+.5, y:y+.5, tex: on ? F1SPR.deskOn : F1SPR.desk, sw:.95, sh:.62, desk:true}); if(on) monitors.push({x:x+.5, y:y+.5, said:false}); }
-      if(ch === "p") sprites.push({x:x+.5, y:y+.5, tex:F1SPR.plant, sw:.45, sh:.9});
-      if(ch === "m"){ marisolAt = {x:x+.5, y:y+.5}; sprites.push({x:x+.5, y:y+.5, tex:F1SPR.marisol, sw:1, sh:1.2, marisol:true}); }
-      if(ch === "E") elev = {x, y}; } }
-    // blood: Marisol's office, the corridor, and a drag mark toward the elevator
-    for(const [bx, by] of [[2.6, 10.2], [4.2, 13.6], [9.5, 13.4], [15.2, 14.3], [18.6, 13.7], [12.4, 7.4]]) sprites.push({x:bx, y:by, tex:F1SPR.blood, sw:1.1, sh:.12, flat:true});
-    const wallTexAt = (x, y) => grid[y][x] === 2 ? F1TEX.door : ((x*31 + y*17) % 7 === 0 ? F1TEX.wallBlood : F1TEX.wall);
-    const solid = (x, y) => { const gx = Math.floor(x), gy = Math.floor(y); return gy < 0 || gx < 0 || gy >= MH || gx >= MW || grid[gy][gx] !== 0; };
-    const opaque = (x, y) => { const gx = Math.floor(x), gy = Math.floor(y); return gy < 0 || gx < 0 || gy >= MH || gx >= MW || grid[gy][gx] === 1 || grid[gy][gx] === 2; };
-    const LIGHTS = [ {x:20.5, y:13.2, r:1, g:.12, b:.08, i:.42, k:.9, flick:true}, {x:3.5, y:2.5, r:.4, g:1, b:.6, i:.35, k:1.4}, {x:11.5, y:8.5, r:1, g:.1, b:.08, i:.6, k:.8, flick:true}, {x:2.5, y:9.5, r:.9, g:.85, b:.6, i:.25, k:1.2} ];
-    monitors.forEach(m => LIGHTS.push({x:m.x, y:m.y, r:.35, g:1, b:.6, i:.22, k:2}));
+      const wx = x*CELL + CELL/2, wz = y*CELL + CELL/2;
+      if(ch === "S") start = {x:wx, z:wz};
+      if(ch === "d" || ch === "k") desks.push({x:wx, z:wz, on: ch === "k" || (x*7 + y*3) % 4 === 0});
+      if(ch === "m") marisolAt = {x:wx, z:wz};
+      if(ch === "E") elev = {gx:x, gy:y}; } }
+    const cellAt = (x, z) => { const gx = Math.floor(x/CELL), gz = Math.floor(z/CELL); return (gz < 0 || gx < 0 || gz >= MH || gx >= MW) ? 1 : grid[gz][gx]; };
+    const solid = (x, z) => cellAt(x, z) !== 0;
+    const opaque = (x, z) => { const c = cellAt(x, z); return c === 1 || c === 2; };
 
-    /* ---------- player, creature, story state ---------- */
-    const P = {x:start.x, y:start.y, a:0, eye:.5, bob:0, stamina:1, hidden:false, breath:1, holding:false};
-    { const dirs = [[1,0],[0,1],[-1,0],[0,-1]]; for(const [dx,dy] of dirs) if(!solid(P.x+dx, P.y+dy)){ P.a = Math.atan2(dy, dx); break; } }
-    const WAY = [[10,3],[19,3],[19,7],[9,7],[11,10],[9,13],[19,13],[15,10],[19,10],[8,5]];
-    const C = {x:19.5, y:13.5, mode:"hidden", path:[], pt:0, tgt:null, wi:0, step:0, frame:0, ft:0, seen:0, lastX:0, lastY:0, searchT:0, grace:0};
-    let fl = true, flick = 1, flickT = 0, t = 0, hasCard = false, phase = "find", checkpoint = {x:start.x, y:start.y, a:P.a}, caught = false, done = false;
-    let sub = null, subT = 0, objective = "Find Marisol's office. It's through the gap at the bottom of this room.", scripted = {glimpse:false, card:false, elevCalled:0, elevOpen:false, phone:false, printer:false, hint:false};
+    /* ---------- materials ---------- */
+    const mWall = new T.MeshStandardMaterial({map:tex(F1ART.wall), roughness:.92}), mWallB = new T.MeshStandardMaterial({map:tex(F1ART.wallBlood), roughness:.85});
+    const mFloor = new T.MeshStandardMaterial({map:tex(F1ART.carpet, MW, MH), roughness:1}), mCeil = new T.MeshStandardMaterial({map:tex(F1ART.ceil, MW*.75, MH*.75), roughness:1});
+    const mDesk = new T.MeshStandardMaterial({color:0x2a231d, roughness:.75}), mMetal = new T.MeshStandardMaterial({color:0x121214, roughness:.6, metalness:.2});
+    const mSkin = new T.MeshStandardMaterial({color:0x8f8276, roughness:.65}), mDark = new T.MeshStandardMaterial({color:0x0a0908, roughness:.9});
+    const mBlood = new T.MeshStandardMaterial({map:tex(F1ART.blood), transparent:true, roughness:.25, metalness:.1, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2});
+    const mDrag = new T.MeshStandardMaterial({map:tex(F1ART.drag), transparent:true, roughness:.3, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2});
+    const mGore = new T.MeshStandardMaterial({color:0x4a0207, roughness:.3, metalness:.1});
+    const box = (w, h, d, m, x, y, z, parent=scene, shadow=true) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = shadow; o.receiveShadow = true; parent.add(o); return o; };
+
+    /* walls: only the cells that touch a walkable cell */
+    for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){ if(grid[y][x] !== 1) continue;
+      const touches = [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy]) => grid[y+dy] && grid[y+dy][x+dx] !== undefined && grid[y+dy][x+dx] !== 1 && grid[y+dy][x+dx] !== 2);
+      if(!touches) continue; box(CELL, WH, CELL, (x*31 + y*17) % 7 === 0 ? mWallB : mWall, x*CELL + 1, WH/2, y*CELL + 1); }
+    { const f = new T.Mesh(new T.PlaneGeometry(MW*CELL, MH*CELL), mFloor); f.rotation.x = -Math.PI/2; f.position.set(MW, 0, MH); f.receiveShadow = true; scene.add(f);
+      const c = new T.Mesh(new T.PlaneGeometry(MW*CELL, MH*CELL), mCeil); c.rotation.x = Math.PI/2; c.position.set(MW, WH, MH); scene.add(c); }
+    /* desks, chairs, monitors */
+    const screenMat = new T.MeshBasicMaterial({map:tex(F1ART.screen)}), offMat = new T.MeshStandardMaterial({color:0x050607, roughness:.2, metalness:.3});
+    for(const d of desks){ const g = new T.Group(); g.position.set(d.x, 0, d.z); g.rotation.y = ((d.x*3 + d.z) % 4) * .05; scene.add(g);
+      box(1.7, .06, .85, mDesk, 0, .76, 0, g); for(const [lx, lz] of [[-.78,-.36],[.78,-.36],[-.78,.36],[.78,.36]]) box(.05, .74, .05, mMetal, lx, .37, lz, g);
+      box(1.6, .5, .03, mDesk, 0, .5, -.4, g);
+      box(.5, .34, .04, mMetal, 0, 1.0, -.15, g); box(.06, .14, .06, mMetal, 0, .83, -.15, g);
+      const s = new T.Mesh(new T.PlaneGeometry(.45, .28), d.on ? screenMat.clone() : offMat); s.position.set(0, 1.0, -.128); g.add(s); d.screen = d.on ? s : null;
+      box(.45, .06, .45, mMetal, .2, .46, .55, g); box(.45, .5, .06, mMetal, .2, .74, .78, g);
+      if(d.on) monitors.push(d); }
+    /* blood: Marisol's office, the corridor, a drag toward the elevator */
+    const decal = (m, x, z, s, rot=0, sx=1) => { const p = new T.Mesh(new T.PlaneGeometry(s*sx, s), m); p.rotation.x = -Math.PI/2; p.rotation.z = rot; p.position.set(x, .012, z); p.receiveShadow = true; scene.add(p); return p; };
+    for(const [x, z, s] of [[5.3, 20.2, 2.6], [8.4, 27.2, 1.6], [19, 26.8, 1.4], [30.4, 28.6, 1.8], [37.2, 27.4, 1.5], [24.8, 14.8, 1.2]]) decal(mBlood, x, z, s, Math.random()*6);
+    decal(mDrag, 28, 28, 3.2, .1, 4); decal(mDrag, 34, 27.6, 3, -.05, 4);
+    /* the plant */
+    { const g = new T.Group(); g.position.set(41, 0, 5); scene.add(g); box(.4, .45, .4, mDesk, 0, .22, 0, g);
+      const lm = new T.MeshStandardMaterial({color:0x17241a, roughness:.8}); for(let i=0;i<9;i++){ const l = new T.Mesh(new T.ConeGeometry(.05, 1.2, 4), lm); l.position.set(Math.cos(i)*.15, 1, Math.sin(i)*.15); l.rotation.set(Math.sin(i)*.5, 0, Math.cos(i)*.5); g.add(l); } }
+
+    /* ---------- lights ---------- */
+    scene.add(new T.HemisphereLight(0x1a1c26, 0x050404, .22));
+    const flash = new T.SpotLight(0xfff0d8, 1.6, 24, .48, .6, 2); flash.castShadow = true; flash.shadow.mapSize.set(1024, 1024); flash.shadow.camera.near = .2; flash.shadow.bias = -.0004;
+    flash.position.set(.24, -.24, -.68); camera.add(flash); const flashT = new T.Object3D(); flashT.position.set(0, -.05, -3); camera.add(flashT); flash.target = flashT;
+    const pl = (col, i, d, x, y, z) => { const l = new T.PointLight(col, i, d, 2); l.position.set(x, y, z); l.base = i; scene.add(l); return l; };
+    const LIGHTS = [pl(0xff2a1a, 1.4, 9, 40.6, 2.6, 28.6), pl(0xff2a1a, 1.1, 8, 23, 2.7, 17.2), pl(0xffd8a0, .9, 6, 5.6, 1.4, 18.4), pl(0x60ffa8, .7, 5, 7, 1.3, 4.6)];
+    for(const [x, z, ry] of [[40.6, 27.6, -Math.PI/2], [23, 16.6, 0]]){ const s = new T.Mesh(new T.PlaneGeometry(.7, .26), new T.MeshBasicMaterial({map:tex(F1ART.exit)})); s.position.set(x - (ry ? .55 : 0), 2.75, z + (ry ? 0 : .5)); s.rotation.y = ry; scene.add(s); }
+
+    /* ---------- Marisol ---------- */
+    const mar = new T.Group(); if(marisolAt){ mar.position.set(marisolAt.x, 0, marisolAt.z); mar.rotation.y = 0; scene.add(mar);
+      box(1.5, .06, .8, mDesk, 0, .76, -.45, mar); for(const lx of [-.7, .7]) box(.05, .74, .7, mMetal, lx, .37, -.45, mar);
+      box(.2, .07, .16, new T.MeshStandardMaterial({color:0xddd6c6, roughness:.4}), -.45, .82, -.5, mar);                          // the desk phone
+      box(.5, .06, .5, mMetal, 0, .46, .2, mar); box(.5, .55, .06, mMetal, 0, .76, .44, mar);
+      const cardigan = new T.MeshStandardMaterial({color:0x3a3744, roughness:.9});
+      const torso = new T.Mesh(new T.CylinderGeometry(.17, .22, .62, 10), cardigan); torso.position.set(0, .82, .22); torso.rotation.x = .35; torso.castShadow = true; mar.add(torso);
+      for(const s of [-1, 1]){ const th = new T.Mesh(new T.CylinderGeometry(.08, .07, .45, 8), cardigan); th.rotation.x = Math.PI/2; th.position.set(s*.1, .52, .02); mar.add(th);
+        const sh = new T.Mesh(new T.CylinderGeometry(.06, .05, .45, 8), mDark); sh.position.set(s*.1, .25, -.2); mar.add(sh); }
+      const head = new T.Mesh(new T.SphereGeometry(.13, 16, 12), mSkin); head.scale.set(1, 1.2, 1); head.position.set(0, 1.18, .05); head.rotation.x = .6; mar.add(head);
+      const hair = new T.Mesh(new T.SphereGeometry(.15, 12, 10, 0, Math.PI*2, 0, Math.PI*.75), mDark); hair.position.set(0, 1.2, .07); hair.rotation.x = .9; mar.add(hair);
+      const veil = box(.26, .38, .04, mDark, 0, 1.02, -.07, mar); veil.rotation.x = .3;                                                         // hair hanging over the face
+      const ua = new T.Mesh(new T.CylinderGeometry(.05, .045, .34, 8), cardigan); ua.position.set(.2, 1.02, .2); ua.rotation.set(-.3, 0, .4); mar.add(ua);
+      const fa = new T.Mesh(new T.CylinderGeometry(.045, .04, .3, 8), mSkin); fa.position.set(.2, 1.2, .02); fa.rotation.set(-1.2, 0, -.2); mar.add(fa);
+      const rec = box(.06, .06, .24, new T.MeshStandardMaterial({color:0xe2dccb, roughness:.4}), .16, 1.25, -.05, mar); rec.rotation.x = -.3;     // the receiver, grown into her hand
+      const seam = new T.Mesh(new T.SphereGeometry(.06, 10, 8), mGore); seam.position.set(.17, 1.23, -.02); seam.scale.set(1, .7, 1.4); mar.add(seam);
+      for(let i=0;i<6;i++){ const d = new T.Mesh(new T.CylinderGeometry(.006, .006, .15 + i*.04, 4), mGore); d.position.set(.2 + (i%3)*.02, 1.05 - i*.04, .02 + i*.02); mar.add(d); }
+      const cord = new T.Mesh(new T.TorusGeometry(.3, .006, 4, 24, Math.PI), new T.MeshStandardMaterial({color:0xddd6c6})); cord.position.set(-.15, 1.0, -.3); cord.rotation.set(.4, .5, 1.6); mar.add(cord);
+      const card = box(.08, .05, .005, new T.MeshStandardMaterial({color:0xe6e2d6, emissive:0x112233}), .22, 1.08, .06, mar); mar.card = card;
+      decal(mBlood, marisolAt.x, marisolAt.z + .2, 2.4); }
+
+    /* ---------- the elevator ---------- */
+    const ex = elev.gx*CELL, ez = elev.gy*CELL + 1;
+    const mDoor = new T.MeshStandardMaterial({color:0x8a8e94, roughness:.35, metalness:.75});
+    const doorL = box(.08, 2.5, .95, mDoor, ex - .04, 1.25, ez - .48), doorR = box(.08, 2.5, .95, mDoor, ex - .04, 1.25, ez + .48);
+    box(.1, .2, 2.2, mMetal, ex - .05, 2.6, ez); const panel = box(.04, .18, .12, new T.MeshBasicMaterial({color:0xff2a1a}), ex - .06, 1.2, ez - 1.15);
+    const indCv = F1ART.canvas(128, 40, () => {}), indTex = new T.CanvasTexture(indCv), ind = new T.Mesh(new T.PlaneGeometry(.5, .16), new T.MeshBasicMaterial({map:indTex}));
+    ind.position.set(ex - .1, 2.88, ez); ind.rotation.y = -Math.PI/2; scene.add(ind);
+    const drawInd = txt => { const c = indCv.getContext("2d"); c.fillStyle = "#100"; c.fillRect(0, 0, 128, 40); c.fillStyle = "#ff3a2a"; c.font = "bold 28px monospace"; c.textAlign = "center"; c.fillText(txt, 64, 30); indTex.needsUpdate = true; };
+    drawInd("B2");
+    box(.05, WH, 2, new T.MeshStandardMaterial({color:0x6a5a40, roughness:.6, emissive:0x2a1a08}), ex + 1.95, WH/2, ez, scene);                   // the inside, warm and lit
+    const inside = pl(0xffd9a0, 0, 5, ex + 1, 2.6, ez);
+    box(2, WH, .1, mMetal, ex + 1, WH/2, ez - 1.0); box(2, WH, .1, mMetal, ex + 1, WH/2, ez + 1.0);           // the car's side walls
+
+    /* ---------- the creature: built from people ---------- */
+    const CR = new T.Group(); scene.add(CR); CR.visible = false;
+    const mFlesh = new T.MeshStandardMaterial({color:0x8a7f74, roughness:.75}), mFleshD = new T.MeshStandardMaterial({color:0x5a4f46, roughness:.8});
+    const limb = (len, r0, r1, m) => { const g = new T.Group(), mesh = new T.Mesh(new T.CylinderGeometry(r0, r1, len, 8), m); mesh.position.y = -len/2; mesh.castShadow = true; g.add(mesh); g.len = len; return g; };
+    const hips = new T.Group(); hips.position.y = 1.35; CR.add(hips);
+    const spine = new T.Group(); hips.add(spine); spine.rotation.x = .35;
+    const torsoM = new T.Mesh(new T.CylinderGeometry(.13, .1, .85, 9), mFlesh); torsoM.position.y = .42; torsoM.castShadow = true; spine.add(torsoM);
+    for(let i=0;i<5;i++){ const rib = new T.Mesh(new T.TorusGeometry(.12 - i*.006, .012, 4, 12, Math.PI), mFleshD); rib.position.set(0, .55 - i*.07, .02); rib.rotation.set(0, Math.PI/2, Math.PI/2); spine.add(rib); }
+    for(const [y, x] of [[.5, .03], [.3, -.04]]){ const f = new T.Mesh(new T.SphereGeometry(.06, 10, 8), mGore); f.position.set(x, y, .1); f.scale.set(1, 1.3, .5); spine.add(f);   // a face, pushing out through the chest
+      const fs = new T.Mesh(new T.SphereGeometry(.045, 10, 8), mFlesh); fs.position.set(x, y, .125); fs.scale.set(1, 1.3, .5); spine.add(fs); }
+    const neck = new T.Group(); neck.position.y = .86; spine.add(neck);
+    const neckM = new T.Mesh(new T.CylinderGeometry(.035, .045, .38, 6), mFlesh); neckM.position.y = .19; neck.add(neckM);
+    const headG = new T.Group(); headG.position.y = .42; neck.add(headG);
+    const faceTex = tex(F1ART.face), faceOpenTex = tex(F1ART.faceOpen);
+    const faceMat = new T.MeshStandardMaterial({map:faceTex, transparent:true, alphaTest:.05, roughness:.6, side:T.DoubleSide});
+    const face = new T.Mesh(new T.PlaneGeometry(.46, .58), faceMat); headG.add(face);
+    const skull = new T.Mesh(new T.SphereGeometry(.15, 14, 12), mDark); skull.scale.set(1, 1.25, .7); skull.position.z = -.13; face.add(skull);
+    const eyeMat = new T.MeshBasicMaterial({color:0xfff4dc, fog:false}), eyes = [];
+    for(const x of [-.075, .075]){ const e = new T.Mesh(new T.SphereGeometry(.014, 8, 6), eyeMat); e.position.set(x, .03, .03); face.add(e); eyes.push(e); }
+    const shoulderY = .8, arms = [], legs = [];
+    for(const s of [-1, 1]){
+      const sh = new T.Group(); sh.position.set(s*.2, shoulderY, 0); spine.add(sh);
+      const up = limb(.62, .04, .032, mFlesh); sh.add(up); const el = new T.Group(); el.position.y = -.62; up.add(el);
+      const lo = limb(.72, .032, .025, mFlesh); el.add(lo); const wr = new T.Group(); wr.position.y = -.72; lo.add(wr);
+      for(let f=0;f<4;f++){ const fg = limb(.26, .009, .005, mFleshD); fg.rotation.set(.1 + f*.05, 0, (f - 1.5)*.12*s); wr.add(fg); }
+      arms.push({sh, el, s});
+      const hp = new T.Group(); hp.position.set(s*.09, 0, 0); hips.add(hp);
+      const th = limb(.66, .05, .035, mFlesh); hp.add(th); const kn = new T.Group(); kn.position.y = -.66; th.add(kn);
+      const sn = limb(.66, .035, .025, mFlesh); kn.add(sn); legs.push({hp, kn, s});
+      for(let i=0;i<3;i++){ const st = new T.Mesh(new T.CylinderGeometry(.006, .004, .2 + i*.08, 4), mGore); st.position.set(.02*i - .02, -.25 - i*.1, .03); th.add(st); } }
+    const crPos = new T.Vector3(); let pose = 0, poseT = 0, twitch = 0;
+    function poseCreature(mode, dt, dist){
+      poseT += dt; const fps = mode === "hunt" ? 14 : 8; if(poseT < 1/fps) return; poseT = 0;                     // stop-motion: it only updates a few times a second
+      const speed = mode === "hunt" ? 1 : mode === "search" ? .15 : .55; pose += speed*1.25;
+      const sw = Math.sin(pose)*.55*speed + .05, hunting = mode === "hunt";
+      legs.forEach(L => { L.hp.rotation.x = sw*L.s; L.kn.rotation.x = Math.max(0, -sw*L.s)*.9 + .15; });
+      arms.forEach(A => { A.sh.rotation.x = hunting ? -1.1 + Math.sin(pose*2 + A.s)*.25 : -sw*A.s*.5 + .1; A.sh.rotation.z = A.s*(hunting ? .25 : .08); A.el.rotation.x = hunting ? -.4 : -.15; });
+      spine.rotation.x = hunting ? .75 : mode === "search" ? .2 : .4;
+      if(Math.random() < .12) twitch = (Math.random() - .5)*1.1;
+      neck.scale.y = mode === "search" ? 1.9 : hunting ? 1.15 : 1;
+      headG.rotation.set(hunting ? -.5 : 0, mode === "search" ? Math.sin(pose*.7)*1.2 : 0, .25 + twitch);
+      face.material.map = dist < 3 || hunting ? faceOpenTex : faceTex; face.material.needsUpdate = true;
+    }
+
+    /* ---------- the hand that holds the light ---------- */
+    const hand = new T.Group(); camera.add(hand); hand.position.set(.26, -.3, -.5);
+    const tube = new T.Mesh(new T.CylinderGeometry(.028, .032, .26, 12), new T.MeshStandardMaterial({color:0x111214, roughness:.35, metalness:.6})); tube.rotation.x = Math.PI/2; hand.add(tube);
+    const lens = new T.Mesh(new T.CircleGeometry(.026, 16), new T.MeshBasicMaterial({color:0xfff2d0})); lens.position.z = -.131; hand.add(lens);
+    const mHand = new T.MeshLambertMaterial({color:0x6e5446}), mNail = new T.MeshLambertMaterial({color:0x9a8072}); const handLight = new T.PointLight(0xffe2c8, .5, .9, 2); handLight.position.set(.18, -.15, -.35); camera.add(handLight);
+    const palm = new T.Mesh(new T.BoxGeometry(.06, .07, .11), mHand); palm.position.set(.05, -.02, .03); palm.visible = false; hand.add(palm);
+    const fingers = [];
+    const fist = new T.Mesh(new T.SphereGeometry(.05, 12, 10), mHand); fist.scale.set(1.05, .95, 1.5); fist.position.set(.012, -.008, .0); hand.add(fist);
+    for(let i=0;i<4;i++){ const f = new T.Group(); f.position.set(-.028, .018, -.055 + i*.034); hand.add(f);
+      const seg = new T.Mesh(new T.SphereGeometry(.016, 8, 6), mHand); seg.scale.set(1, .85, 1); f.add(seg);
+      const nail = new T.Mesh(new T.SphereGeometry(.009, 6, 5), mNail.clone()); nail.position.set(-.012, -.006, 0); nail.scale.set(.6, 1, 1); f.add(nail); f.nail = nail;
+      const stump = new T.Mesh(new T.SphereGeometry(.014, 6, 5), mGore); stump.visible = false; f.add(stump); f.stump = stump; f.seg = seg; fingers.push(f); }
+    const thumb = new T.Mesh(new T.CylinderGeometry(.012, .011, .06, 6), mHand); thumb.position.set(-.01, .02, .02); thumb.rotation.set(.3, 0, .9); hand.add(thumb);
+    const arm = new T.Mesh(new T.CylinderGeometry(.035, .045, .35, 10), mHand); arm.position.set(.07, -.12, .2); arm.rotation.x = 1.2; hand.add(arm);
+    const drips = []; for(let i=0;i<3;i++){ const d = new T.Mesh(new T.CylinderGeometry(.003, .003, 1, 4), mGore); d.position.set(.0 + i*.01, -.06, .04 + i*.02); d.visible = false; hand.add(d); drips.push(d); }
+    let lastDmg = -1;
+    const updateHand = () => { const dmg = TAKEN.letters.length; if(dmg === lastDmg) return; lastDmg = dmg;
+      fingers.forEach((f, i) => { const gone = (dmg >= 3 && i === 3) || (dmg >= 5 && i === 2); f.seg.visible = f.nail.visible = !gone; f.stump.visible = gone;
+        f.nail.material.color.set(i === 3 && dmg >= 1 ? (dmg >= 2 ? 0x4a0207 : 0x0b0806) : 0x9a8072); });
+      mHand.color.set(dmg >= 2 ? 0x5a4038 : 0x6e5446); drips.forEach(d => d.visible = dmg >= 3);
+      flash.color.set(dmg >= 4 ? 0xffc0a8 : dmg >= 2 ? 0xffe0c8 : 0xfff0d8); };
+
+    /* ---------- player and story state ---------- */
+    const P = {x:start.x, z:start.z, yaw:0, pitch:0, bob:0, stamina:1, hidden:null, breath:1, holding:false, eye:1.62};
+    for(const [dx, dz, yaw] of [[1,0,-Math.PI/2],[0,1,Math.PI],[-1,0,Math.PI/2],[0,-1,0]]) if(!solid(P.x + dx*CELL, P.z + dz*CELL)){ P.yaw = yaw; break; }
+    const WAY = [[10,3],[19,3],[19,7],[9,7],[11,10],[9,13],[19,13],[15,10],[19,10],[8,5]].map(([x,y]) => [x*CELL+1, y*CELL+1]);
+    const C = {x:39, z:27, mode:"hidden", path:[], pt:0, tgt:null, wi:0, step:0, lastX:0, lastZ:0, searchT:0, grace:0, yaw:0};
+    let fl = true, flick = 1, flickT = 0, t = 0, hasCard = false, checkpoint = {x:P.x, z:P.z, yaw:P.yaw}, caught = false, done = false, paused = false;
+    let sub = null, subT = 0, objective = "Find Marisol's office. It's through the gap at the bottom of this room.";
+    const scripted = {glimpse:false, phone:false, printer:false, hint:false, elevCalled:0, elevOpen:false, elevSent:false};
+    const marks = [];   // where sounds came from, drawn at the edge of the screen
     const say = (txt, sec=4.5, who="s") => { sub = {txt, who}; subT = sec; };
     const setObj = txt => { objective = txt; AU.notif(); };
 
-    /* ---------- canvas + input ---------- */
-    const cv = document.getElementById("arena"), ctx = cv.getContext("2d");
-    cv.style.display = "block"; cv.style.opacity = "1"; cv.style.cursor = "crosshair";
-    let W = 0, H = 0, dpr = 1, RW = 320, RH = 200, off, octx, img, px, zbuf;
-    const fit = () => { dpr = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W*dpr; cv.height = H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
-      RW = W < 700 ? 240 : 320; RH = Math.max(140, Math.min(260, Math.round(RW*H/W)));
-      off = document.createElement("canvas"); off.width = RW; off.height = RH; octx = off.getContext("2d"); img = octx.createImageData(RW, RH); px = new Uint32Array(img.data.buffer); zbuf = new Float32Array(RW); };
-    fit(); addEventListener("resize", fit);
-    const K = {}; let lookDX = 0, dragX = null;
-    const kd = e => { const k = e.key.toLowerCase(); K[k] = true;
-      if(k === "f") toggleLight(); if(k === "e") action(); if(k === " "){ e.preventDefault(); P.holding = true; }
+    /* ---------- input ---------- */
+    const K = {}; let lookDX = 0, lookDY = 0, dragging = null;
+    const kd = e => { const k = e.key.toLowerCase(); K[k] = true; if(k === "f") toggleLight(); if(k === "e") action(); if(k === " "){ e.preventDefault(); P.holding = true; }
       if(["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"," "].includes(k)) e.preventDefault(); };
     const ku = e => { const k = e.key.toLowerCase(); K[k] = false; if(k === " ") P.holding = false; };
     addEventListener("keydown", kd); addEventListener("keyup", ku);
-    const md = e => { dragX = e.clientX; try{ cv.requestPointerLock && cv.requestPointerLock(); }catch(x){} };
-    const mm = e => { if(document.pointerLockElement === cv) lookDX += e.movementX; else if(dragX !== null){ lookDX += e.clientX - dragX; dragX = e.clientX; } };
-    const mu = () => { dragX = null; };
+    const md = e => { dragging = [e.clientX, e.clientY]; try{ cv.requestPointerLock && cv.requestPointerLock(); }catch(x){} };
+    const mm = e => { if(document.pointerLockElement === cv){ lookDX += e.movementX; lookDY += e.movementY; } else if(dragging){ lookDX += e.clientX - dragging[0]; lookDY += e.clientY - dragging[1]; dragging = [e.clientX, e.clientY]; } };
+    const mu = () => { dragging = null; };
     cv.addEventListener("mousedown", md); addEventListener("mousemove", mm); addEventListener("mouseup", mu);
-
-    /* touch: left thumb stick, drag anywhere else to look, buttons on the right */
     const touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
     const ui = document.createElement("div"); ui.id = "f1ui";
     ui.innerHTML = `<style>
       #f1ui{ position:fixed; inset:0; z-index:9991; pointer-events:none; font-family:var(--mono); user-select:none; -webkit-user-select:none }
-      #f1ui .stick{ position:absolute; left:calc(28px + env(safe-area-inset-left,0px)); bottom:calc(28px + env(safe-area-inset-bottom,0px)); width:140px; height:140px; border-radius:50%; border:2px solid rgba(255,255,255,.18); background:rgba(255,255,255,.04); pointer-events:auto; touch-action:none }
-      #f1ui .nub{ position:absolute; left:45px; top:45px; width:50px; height:50px; border-radius:50%; background:rgba(255,255,255,.22) }
-      #f1ui .btns{ position:absolute; right:calc(20px + env(safe-area-inset-right,0px)); bottom:calc(24px + env(safe-area-inset-bottom,0px)); display:grid; grid-template-columns:repeat(2, 84px); gap:12px; pointer-events:auto }
-      #f1ui button{ height:64px; border-radius:16px; border:1px solid rgba(255,255,255,.25); background:rgba(0,0,0,.55); color:#e9e2d8; font:600 13px var(--mono); letter-spacing:.08em; touch-action:none }
-      #f1ui button.on{ background:#e9e2d8; color:#000 } #f1ui .act{ grid-column:span 2; background:rgba(125,255,176,.2); border-color:#7dffb0; color:#d8ffe8; display:none }
-      #f1ui .breath{ position:absolute; left:50%; bottom:calc(30px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); width:min(320px,70vw); height:84px; border-radius:20px; border:2px solid #ff2d55; background:rgba(60,0,8,.7); color:#ffd2d8; font:700 16px var(--mono); letter-spacing:.12em; display:none; pointer-events:auto; touch-action:none }
+      #f1ui .stick{ position:absolute; left:calc(28px + env(safe-area-inset-left,0px)); bottom:calc(28px + env(safe-area-inset-bottom,0px)); width:150px; height:150px; border-radius:50%; border:2px solid rgba(255,255,255,.16); background:rgba(255,255,255,.04); pointer-events:auto; touch-action:none }
+      #f1ui .nub{ position:absolute; left:48px; top:48px; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.2) }
+      #f1ui .btns{ position:absolute; right:calc(20px + env(safe-area-inset-right,0px)); bottom:calc(24px + env(safe-area-inset-bottom,0px)); display:grid; grid-template-columns:repeat(2, 86px); gap:12px; pointer-events:auto }
+      #f1ui button{ height:64px; border-radius:16px; border:1px solid rgba(255,255,255,.22); background:rgba(0,0,0,.5); color:#e9e2d8; font:600 13px var(--mono); letter-spacing:.08em; touch-action:none }
+      #f1ui button.on{ background:#e9e2d8; color:#000 } #f1ui .act{ grid-column:span 2; background:rgba(125,255,176,.18); border-color:#7dffb0; color:#d8ffe8; display:none }
+      #f1ui .breath{ position:absolute; left:50%; bottom:calc(30px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); width:min(320px,70vw); height:84px; border-radius:20px; border:2px solid #ff2d55; background:rgba(60,0,8,.7); color:#ffd2d8; font:700 15px var(--mono); letter-spacing:.1em; display:none; pointer-events:auto; touch-action:none }
       #f1ui .look{ position:absolute; inset:0; pointer-events:auto; touch-action:none }
-      #f1ui .fs{ position:absolute; top:calc(12px + env(safe-area-inset-top,0px)); right:calc(12px + env(safe-area-inset-right,0px)); height:40px; width:auto; padding:0 14px; pointer-events:auto; font-size:12px; border-radius:10px }
     </style>
     ${touch ? `<div class="look"></div><div class="stick"><div class="nub"></div></div>` : ""}
     <div class="btns">${touch ? `<button class="light on">LIGHT</button><button class="run">RUN</button>` : ""}<button class="act">ACTION</button></div>
@@ -2377,71 +2490,72 @@ function floorOne(opts={}){
     const btnAct = ui.querySelector(".act"), btnBreath = ui.querySelector(".breath"), btnLight = ui.querySelector(".light"), btnRun = ui.querySelector(".run");
     const stick = {x:0, y:0, id:null};
     if(touch){
-      const st = ui.querySelector(".stick"), nub = ui.querySelector(".nub"), look = ui.querySelector(".look"); let lookId = null, lookX = 0;
-      const sm = e => { for(const tt of e.changedTouches) if(tt.identifier === stick.id){ const r = st.getBoundingClientRect(); let dx = tt.clientX - (r.left + 70), dy = tt.clientY - (r.top + 70); const m = Math.hypot(dx, dy);
-          if(m > 55){ dx *= 55/m; dy *= 55/m; } stick.x = dx/55; stick.y = dy/55; nub.style.transform = `translate(${dx}px,${dy}px)`; } e.preventDefault(); };
+      const st = ui.querySelector(".stick"), nub = ui.querySelector(".nub"), look = ui.querySelector(".look"); let lookId = null, lx = 0, ly = 0;
+      const sm = e => { for(const tt of e.changedTouches) if(tt.identifier === stick.id){ const r = st.getBoundingClientRect(); let dx = tt.clientX - (r.left + 75), dy = tt.clientY - (r.top + 75); const m = Math.hypot(dx, dy);
+          if(m > 60){ dx *= 60/m; dy *= 60/m; } stick.x = dx/60; stick.y = dy/60; nub.style.transform = `translate(${dx}px,${dy}px)`; } e.preventDefault(); };
       st.addEventListener("touchstart", e => { stick.id = e.changedTouches[0].identifier; sm(e); }, {passive:false}); st.addEventListener("touchmove", sm, {passive:false});
-      st.addEventListener("touchend", e => { stick.id = null; stick.x = stick.y = 0; nub.style.transform = ""; });
-      look.addEventListener("touchstart", e => { const tt = e.changedTouches[0]; lookId = tt.identifier; lookX = tt.clientX; e.preventDefault(); }, {passive:false});
-      look.addEventListener("touchmove", e => { for(const tt of e.changedTouches) if(tt.identifier === lookId){ lookDX += (tt.clientX - lookX)*1.4; lookX = tt.clientX; } e.preventDefault(); }, {passive:false});
+      st.addEventListener("touchend", () => { stick.id = null; stick.x = stick.y = 0; nub.style.transform = ""; });
+      look.addEventListener("touchstart", e => { const tt = e.changedTouches[0]; lookId = tt.identifier; lx = tt.clientX; ly = tt.clientY; e.preventDefault(); }, {passive:false});
+      look.addEventListener("touchmove", e => { for(const tt of e.changedTouches) if(tt.identifier === lookId){ lookDX += (tt.clientX - lx)*1.6; lookDY += (tt.clientY - ly)*1.6; lx = tt.clientX; ly = tt.clientY; } e.preventDefault(); }, {passive:false});
       look.addEventListener("touchend", () => { lookId = null; });
       btnLight.addEventListener("touchstart", e => { e.preventDefault(); toggleLight(); }, {passive:false});
       btnRun.addEventListener("touchstart", e => { e.preventDefault(); K.shift = true; btnRun.classList.add("on"); }, {passive:false});
       btnRun.addEventListener("touchend", () => { K.shift = false; btnRun.classList.remove("on"); });
     }
-    btnAct.addEventListener("click", () => action());
-    btnAct.addEventListener("touchstart", e => { e.preventDefault(); action(); }, {passive:false});
+    btnAct.addEventListener("click", () => action()); btnAct.addEventListener("touchstart", e => { e.preventDefault(); action(); }, {passive:false});
     const holdOn = e => { e.preventDefault(); P.holding = true; }, holdOff = () => { P.holding = false; };
     btnBreath.addEventListener("touchstart", holdOn, {passive:false}); btnBreath.addEventListener("touchend", holdOff);
     btnBreath.addEventListener("mousedown", holdOn); btnBreath.addEventListener("mouseup", holdOff); btnBreath.addEventListener("mouseleave", holdOff);
     function toggleLight(){ if(P.hidden) return; fl = !fl; AU.click(); if(btnLight) btnLight.classList.toggle("on", fl); }
 
-    /* ---------- world helpers ---------- */
-    const los = (ax, ay, bx, by) => { const dx = bx-ax, dy = by-ay, d = Math.hypot(dx, dy), n = Math.ceil(d*6); for(let i=1;i<n;i++) if(opaque(ax + dx*i/n, ay + dy*i/n)) return false; return true; };
+    /* ---------- helpers ---------- */
+    const los = (ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, d = Math.hypot(dx, dz), n = Math.ceil(d*4); for(let i=1;i<n;i++) if(opaque(ax + dx*i/n, az + dz*i/n)) return false; return true; };
     const bfs = (sx, sy, tx, ty) => { const key = (x,y) => y*MW+x, prev = new Map([[key(sx,sy), null]]), q = [[sx,sy]];
       while(q.length){ const [x,y] = q.shift(); if(x === tx && y === ty) break;
         for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+dx, ny = y+dy; if(nx<0||ny<0||nx>=MW||ny>=MH||grid[ny][nx] !== 0 || prev.has(key(nx,ny))) continue; prev.set(key(nx,ny), [x,y]); q.push([nx,ny]); } }
       const path = []; let cur = [tx,ty]; if(!prev.has(key(tx,ty))) return []; while(cur){ path.unshift(cur); cur = prev.get(key(cur[0],cur[1])); } return path.slice(1); };
-    const nearDesk = () => sprites.find(s => s.desk && Math.hypot(s.x - P.x, s.y - P.y) < 1.15);
-    const angTo = (x, y) => { let a = Math.atan2(y - P.y, x - P.x) - P.a; while(a > Math.PI) a -= 6.283; while(a < -Math.PI) a += 6.283; return a; };
-    const footstep = (d, pan, heavy) => { if(!AU.ok()) return; const t0 = AU.ctx.currentTime, gain = Math.min(.9, 1.6/(1 + d*d*.12)) * (heavy ? 1.2 : 1);
-      const o = AU.ctx.createOscillator(); o.frequency.setValueAtTime(heavy ? 95 : 120, t0); o.frequency.exponentialRampToValueAtTime(38, t0 + .14);
+    const relAng = (x, z) => { const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), dx = x - P.x, dz = z - P.z; return Math.atan2(fx*dz - fz*dx, fx*dx + fz*dz); };   // + = to your right
+    const nearDesk = () => desks.find(d => Math.hypot(d.x - P.x, d.z - P.z) < 1.9);
+    const footstep = (d, ang, heavy) => { if(!AU.ok()) return; const t0 = AU.ctx.currentTime, gain = Math.min(1, 3/(1 + d*d*.05)) * (heavy ? 1.15 : 1), pan = Math.max(-1, Math.min(1, Math.sin(ang)));
+      const o = AU.ctx.createOscillator(); o.frequency.setValueAtTime(heavy ? 90 : 115, t0); o.frequency.exponentialRampToValueAtTime(36, t0 + .14);
       const g = AU.ctx.createGain(); g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(gain, t0 + .005); g.gain.exponentialRampToValueAtTime(.001, t0 + .3);
-      const out = AU.pan(Math.max(-1, Math.min(1, pan))); o.connect(g); g.connect(out); o.start(t0); o.stop(t0 + .32);
-      if(Math.random() < .35){ const n = AU.noise(.12), f = AU.ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 700; const g2 = AU.ctx.createGain();
-        g2.gain.setValueAtTime(gain*.5, t0 + .05); g2.gain.exponentialRampToValueAtTime(.001, t0 + .17); n.connect(f); f.connect(g2); g2.connect(out); n.start(t0 + .05); } };
-    const crack = (d, pan) => { if(!AU.ok()) return; const t0 = AU.ctx.currentTime; for(let i=0;i<rnd(2,4);i++){ const n = AU.noise(.03), f = AU.ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = rnd(1200, 2600);
-      const g = AU.ctx.createGain(), at = t0 + i*rnd(3,9)/100; g.gain.setValueAtTime(Math.min(.5, 1.2/(1+d*d*.1)), at); g.gain.exponentialRampToValueAtTime(.001, at + .03); n.connect(f); f.connect(g); g.connect(AU.pan(pan)); n.start(at); } };
+      // behind you sounds duller
+      const lp = AU.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = Math.abs(ang) > 1.6 ? 500 : 2500;
+      const out = AU.pan(pan); o.connect(g); g.connect(lp); lp.connect(out); o.start(t0); o.stop(t0 + .32);
+      const n = AU.noise(.1), f = AU.ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 900; const g2 = AU.ctx.createGain();
+      g2.gain.setValueAtTime(gain*.45, t0 + .02); g2.gain.exponentialRampToValueAtTime(.001, t0 + .14); n.connect(f); f.connect(g2); g2.connect(out); n.start(t0 + .02);
+      if(d < 22) marks.push({ang, life:1, loud:Math.min(1, 2.5/(1 + d*.25)), kind:"step"}); };
+    const crack = (d, ang) => { if(!AU.ok()) return; const t0 = AU.ctx.currentTime, pan = Math.max(-1, Math.min(1, Math.sin(ang)));
+      for(let i=0;i<rnd(2,5);i++){ const n = AU.noise(.03), f = AU.ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = rnd(1200, 2800);
+        const g = AU.ctx.createGain(), at = t0 + i*rnd(3,9)/100; g.gain.setValueAtTime(Math.min(.6, 2/(1 + d*d*.05)), at); g.gain.exponentialRampToValueAtTime(.001, at + .03); n.connect(f); f.connect(g); g.connect(AU.pan(pan)); n.start(at); }
+      if(d < 18) marks.push({ang, life:1, loud:Math.min(1, 2/(1 + d*.25)), kind:"crack"}); };
 
     /* ---------- actions ---------- */
     const context = () => {
-      if(caught || done) return null;
+      if(caught || done || paused) return null;
       if(P.hidden) return "LEAVE THE DESK";
-      if(!hasCard && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.y - P.y) < 1.5) return "TAKE THE KEYCARD";
-      if(elev && Math.hypot(elev.x + .5 - P.x, elev.y + .5 - P.y) < 1.6 && !scripted.elevOpen) return hasCard ? (scripted.elevCalled ? null : "CALL THE ELEVATOR") : "CALL THE ELEVATOR";
+      if(!hasCard && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 2.2) return "TAKE THE KEYCARD";
+      if(Math.hypot(ex - 1 - P.x, ez - P.z) < 2.4 && !scripted.elevOpen && !scripted.elevCalled) return "CALL THE ELEVATOR";
       if(nearDesk()) return "HIDE UNDER THE DESK";
-      return null;
-    };
+      return null; };
     async function action(){
       const c = context(); if(!c) return; AU.click();
-      if(c === "HIDE UNDER THE DESK"){ const d = nearDesk(); P.hidden = d; P.hx = P.x; P.hy = P.y; fl = false; if(btnLight) btnLight.classList.remove("on"); P.breath = 1; return; }
-      if(c === "LEAVE THE DESK"){ P.hidden = false; return; }
+      if(c === "HIDE UNDER THE DESK"){ const d = nearDesk(); P.hidden = d; P.px = P.x; P.pz = P.z; P.x = d.x + (P.x - d.x)*.25; P.z = d.z + (P.z - d.z)*.25; fl = false; if(btnLight) btnLight.classList.remove("on"); P.breath = 1; return; }
+      if(c === "LEAVE THE DESK"){ P.x = P.px; P.z = P.pz; P.hidden = null; return; }
       if(c === "TAKE THE KEYCARD") return takeCard();
       if(c === "CALL THE ELEVATOR"){ if(!hasCard){ say("The panel is dead. A card reader blinks red: KEYCARD REQUIRED.", 4, "n"); AU.win98err(); return; }
-        scripted.elevCalled = t; AU.tone(880, "sine", .01, .1, .3); say("The elevator is coming up from the basement. It's slow.", 4, "n"); setObj("Survive until the elevator arrives."); return; }
+        scripted.elevCalled = t; panel.material.color.set(0x2aff6a); AU.tone(880, "sine", .01, .1, .3); say("The elevator is coming up from the basement. It's slow.", 4, "n"); setObj("Survive until the elevator arrives."); }
     }
 
-    /* ---------- Marisol ---------- */
+    /* ---------- Marisol: the close-up ---------- */
     async function takeCard(){
-      paused = true; AU.duck(.5); AU.breath(true);
-      const pull = await closeup();
-      AU.breath(false); paused = false; if(!live()) return;
-      hasCard = true; checkpoint = {x:P.x, y:P.y, a:P.a}; AU.scream(); AU.whisper("thank you for holding");
+      paused = true; AU.duck(.5); AU.breath(true); await closeup(); AU.breath(false); paused = false; if(!live()) return;
+      hasCard = true; if(mar.card) mar.card.visible = false; checkpoint = {x:P.x, z:P.z, yaw:P.yaw}; AU.scream(); AU.whisper("thank you for holding");
       say("She whispered something. Then the phone in her hand started ringing.", 5, "n");
-      setTimeout(() => { if(!live()) return; AU.stinger(); say("it heard that. get to the elevator. end of the corridor, bottom right. — s.", 6); setObj("Get to the elevator: end of the bottom corridor, on the right.");
-        C.mode = "investigate"; C.tgt = [Math.floor(marisolAt.x), Math.floor(marisolAt.y)]; C.grace = 1.5; C.x = 12.5; C.y = 13.5; C.path = []; }, 2200);
+      const ring = setInterval(() => { if(!live() || done) return clearInterval(ring); const d = Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z); if(d < 14) AU.tone(1180, "square", .005, .05/(1 + d*.2), .25); }, 900);
+      setTimeout(() => { if(!live()) return; AU.stinger(); say("it heard that. it's coming to look. get to the elevator: end of the bottom corridor, on the right. — s.", 7);
+        setObj("Get to the elevator: end of the bottom corridor, on the right."); C.mode = "investigate"; C.tgt = [Math.floor(marisolAt.x/CELL), Math.floor(marisolAt.z/CELL)]; C.grace = 1.5; C.x = 25; C.z = 27; C.path = []; }, 2200);
     }
-    /* the close-up: her hand, the receiver grown into it, the card on a lanyard around her wrist. hold to pull. */
     function closeup(){
       return new Promise(res => {
         const ov = document.createElement("canvas"); ov.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;z-index:9995;background:#000;touch-action:none";
@@ -2449,52 +2563,38 @@ function floorOne(opts={}){
         const c = ov.getContext("2d"); c.setTransform(D,0,0,D,0,0); const w = innerWidth, h = innerHeight;
         const hint = document.createElement("div"); hint.style.cssText = "position:fixed;left:0;right:0;bottom:calc(40px + env(safe-area-inset-bottom,0px));text-align:center;z-index:9996;font:600 15px var(--mono);color:#ffd2d8;letter-spacing:.1em;pointer-events:none";
         hint.textContent = touch ? "PRESS AND HOLD ANYWHERE TO PULL THE CARD FREE" : "HOLD THE MOUSE BUTTON (OR SPACE) TO PULL THE CARD FREE"; document.body.appendChild(hint);
-        let p = 0, holding = false, tt = 0, last = performance.now(), drips = [];
+        let p = 0, holding = false, last = performance.now(), drips2 = [];
         const on = e => { e.preventDefault(); holding = true; }, offH = () => { holding = false; };
         ov.addEventListener("mousedown", on); addEventListener("mouseup", offH); ov.addEventListener("touchstart", on, {passive:false}); ov.addEventListener("touchend", offH);
         const kk = e => { if(e.key === " "){ e.preventDefault(); holding = e.type === "keydown"; } }; addEventListener("keydown", kk); addEventListener("keyup", kk);
         const frame = now => {
-          const dt = Math.min(.05, (now - last)/1000); last = now; tt += dt;
+          const dt = Math.min(.3, (now - last)/1000); last = now;
           if(holding){ p = Math.min(1, p + dt/2.6); if(Math.random() < dt*8) crack(1, 0); if(Math.random() < dt*3) AU.wet(); } else p = Math.max(0, p - dt*.25);
-          const sx = (Math.random()-.5)*p*6, cx = w*.5 + sx, cy = h*.5;
+          const sx = (Math.random()-.5)*p*6, cx = w*.5 + sx, cy = h*.5, S = Math.min(w, h);
           c.fillStyle = "#000"; c.fillRect(0, 0, w, h);
-          const L = c.createRadialGradient(cx - w*.1, cy - h*.15, 10, cx, cy, Math.max(w,h)*.6); L.addColorStop(0, "rgba(255,240,215,.22)"); L.addColorStop(1, "rgba(0,0,0,0)");
-          const S = Math.min(w, h);
-          // the desk, wet
           c.fillStyle = "#1a1310"; c.fillRect(0, cy + S*.22, w, h); c.fillStyle = "#3a0306"; c.beginPath(); c.ellipse(cx, cy + S*.3, S*.55, S*.1, 0, 0, 7); c.fill();
-          // the receiver, lying in her grip
-          c.fillStyle = "#d8d2c2"; c.beginPath(); c.roundRect ? c.roundRect(cx - S*.42, cy - S*.08, S*.84, S*.16, S*.06) : c.rect(cx - S*.42, cy - S*.08, S*.84, S*.16); c.fill();
-          c.fillStyle = "#b8b2a2"; c.fillRect(cx - S*.42, cy + S*.04, S*.84, S*.04);
-          // the hand: skin grown over the plastic, split where she tried to let go
+          c.fillStyle = "#d8d2c2"; c.fillRect(cx - S*.42, cy - S*.08, S*.84, S*.16); c.fillStyle = "#b8b2a2"; c.fillRect(cx - S*.42, cy + S*.04, S*.84, S*.04);
           c.fillStyle = "#b3a090"; c.beginPath(); c.ellipse(cx + S*.02, cy, S*.2, S*.15, -.1, 0, 7); c.fill();
           for(let i=0;i<4;i++){ c.beginPath(); c.ellipse(cx - S*.1 + i*S*.075, cy - S*.12, S*.035, S*.07, .1, 0, 7); c.fill(); }
           c.strokeStyle = "#5a0408"; c.lineWidth = S*.012; c.lineCap = "round";
           for(let i=0;i<5;i++){ const x0 = cx - S*.2 + i*S*.09; c.beginPath(); c.moveTo(x0, cy - S*.04); c.quadraticCurveTo(x0 + S*.02, cy + S*.02, x0 - S*.01, cy + S*.07); c.stroke(); }
-          c.fillStyle = "#6e050b"; c.beginPath(); c.ellipse(cx + S*.02, cy + S*.08, S*.22, S*.03, 0, 0, 7); c.fill();          // the seam where skin meets plastic
-          c.fillStyle = "rgba(200,180,160,.5)"; for(let i=0;i<20;i++) c.fillRect(cx - S*.2 + i*S*.021, cy + S*.07, S*.006, S*.02);   // the stitches it grew
-          // wrist, lanyard, card: the card comes away with the skin it's stuck to
-          const pull = p*S*.35;
-          c.fillStyle = "#a89484"; c.fillRect(cx + S*.15, cy - S*.06, S*.35, S*.12);
+          c.fillStyle = "#6e050b"; c.beginPath(); c.ellipse(cx + S*.02, cy + S*.08, S*.22, S*.03, 0, 0, 7); c.fill();
+          c.fillStyle = "rgba(200,180,160,.5)"; for(let i=0;i<20;i++) c.fillRect(cx - S*.2 + i*S*.021, cy + S*.07, S*.006, S*.02);
+          const pull = p*S*.35; c.fillStyle = "#a89484"; c.fillRect(cx + S*.15, cy - S*.06, S*.35, S*.12);
           c.strokeStyle = "#1b4a8a"; c.lineWidth = S*.012; c.beginPath(); c.moveTo(cx + S*.3, cy - S*.06); c.quadraticCurveTo(cx + S*.36, cy + S*.2 + pull*.4, cx + S*.28 + pull*.3, cy + S*.28 + pull); c.stroke();
           const kx = cx + S*.2 + pull*.3, ky = cy + S*.26 + pull;
-          if(p > .25){ c.fillStyle = "#8a0a10"; c.beginPath(); c.moveTo(cx + S*.24, cy + S*.05); c.lineTo(kx + S*.02, ky); c.lineTo(kx + S*.12, ky); c.lineTo(cx + S*.34, cy + S*.05); c.fill();   // a strip of her, still attached
+          if(p > .25){ c.fillStyle = "#8a0a10"; c.beginPath(); c.moveTo(cx + S*.24, cy + S*.05); c.lineTo(kx + S*.02, ky); c.lineTo(kx + S*.12, ky); c.lineTo(cx + S*.34, cy + S*.05); c.fill();
             c.strokeStyle = "rgba(210,180,170,.6)"; c.lineWidth = 1; for(let i=0;i<6;i++){ c.beginPath(); c.moveTo(cx + S*.26 + i*S*.014, cy + S*.05); c.lineTo(kx + S*.03 + i*S*.015, ky); c.stroke(); } }
           c.fillStyle = "#e6e2d6"; c.fillRect(kx, ky, S*.16, S*.1); c.fillStyle = "#39d6ff"; c.fillRect(kx + S*.01, ky + S*.012, S*.04, S*.025);
           c.fillStyle = "#222"; c.font = `${Math.round(S*.018)}px ui-monospace,monospace`; c.fillText("NIMBUS · M. REYES", kx + S*.01, ky + S*.07);
-          if(p > .2 && Math.random() < p*.6) drips.push({x: cx + S*(.2 + Math.random()*.15), y: cy + S*.06, v: S*(.1 + Math.random()*.2)});
-          drips = drips.filter(d => (d.y += d.v*dt) < h); c.fillStyle = "#6a0509"; drips.forEach(d => c.fillRect(d.x, d.y, 2, 7));
-          c.fillStyle = L; c.fillRect(0, 0, w, h);
+          if(p > .2 && Math.random() < p*.6) drips2.push({x: cx + S*(.2 + Math.random()*.15), y: cy + S*.06, v: S*(.1 + Math.random()*.2)});
+          drips2 = drips2.filter(d => (d.y += d.v*dt) < h); c.fillStyle = "#6a0509"; drips2.forEach(d => c.fillRect(d.x, d.y, 2, 7));
           c.save(); c.filter = "blur(2px) brightness(.62) contrast(1.25) saturate(.8)"; c.drawImage(ov, 0, 0, ov.width, ov.height, 0, 0, w, h); c.restore();
           c.fillStyle = "rgba(0,0,0,.18)"; for(let y=0;y<h;y+=3) c.fillRect(0, y, w, 1);
-          for(let i=0;i<500;i++){ c.fillStyle = Math.random() < .5 ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.25)"; c.fillRect(Math.random()*w, Math.random()*h, 2, 2); }
-          if(p > .55 && Math.random() < .05){ c.fillStyle = "rgba(120,0,10,.25)"; c.fillRect(0, 0, w, h); }
           const vg = c.createRadialGradient(cx, cy, S*.2, cx, cy, Math.max(w,h)*.7); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.92)"); c.fillStyle = vg; c.fillRect(0, 0, w, h);
           c.fillStyle = "#300"; c.fillRect(w*.3, h - 18, w*.4, 6); c.fillStyle = "#ff2d55"; c.fillRect(w*.3, h - 18, w*.4*p, 6);
-          if(p >= 1){ // it comes free. she looks up.
-            hint.remove(); AU.hit(); AU.wet();
-            c.fillStyle = "#000"; c.fillRect(0, 0, w, h); setTimeout(() => {
-              c.fillStyle = "#000"; c.fillRect(0, 0, w, h); CREATURE.head(c, w/2, h*.52, Math.min(w*.9, h*.95), {lit:.55, grin:.15, tilt:.5, detail:true, eyes:false});
-              c.fillStyle = "rgba(90,0,8,.55)"; c.fillRect(w/2 - Math.min(w,h)*.18, h*.3, Math.min(w,h)*.36, h*.08);       // where her eyes were
+          if(p >= 1){ hint.remove(); AU.hit(); AU.wet(); c.fillStyle = "#000"; c.fillRect(0, 0, w, h);
+            setTimeout(() => { c.fillStyle = "#000"; c.fillRect(0, 0, w, h); c.drawImage(F1ART.marisolFace, w/2 - Math.min(w,h)*.35, h*.08, Math.min(w,h)*.7, Math.min(w,h)*.875);
               setTimeout(() => { removeEventListener("mouseup", offH); removeEventListener("keydown", kk); removeEventListener("keyup", kk); ov.remove(); res(true); }, 650); }, 300);
             return; }
           if(live()) requestAnimationFrame(frame); else { ov.remove(); hint.remove(); }
@@ -2505,17 +2605,16 @@ function floorOne(opts={}){
 
     /* ---------- getting caught ---------- */
     async function getCaught(){
-      caught = true; P.hidden = false; AU.breath(false); AU.heartbeat(0); AU.duck(.3);
+      caught = true; P.hidden = null; AU.breath(false); AU.heartbeat(0); AU.duck(.3);
       const ov = document.createElement("canvas"); ov.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;z-index:9995;background:#000";
       ov.width = innerWidth; ov.height = innerHeight; document.body.appendChild(ov); const c = ov.getContext("2d"), w = ov.width, h = ov.height, S = Math.min(w, h);
       AU.scream(); AU.stinger(); crack(.5, 0);
       const t0 = performance.now(), splat = [];
-      for(let k=0;k<9;k++){ const cx0 = Math.random()*w, cy0 = Math.random()*h*.6, R = S*(.02 + Math.random()*.05);                      // clusters, not dots
+      for(let k=0;k<9;k++){ const cx0 = Math.random()*w, cy0 = Math.random()*h*.6, R = S*(.02 + Math.random()*.05);
         for(let j=0;j<14;j++){ const a = Math.random()*6.28, rr = Math.random()*R*2.4; splat.push({x:cx0 + Math.cos(a)*rr, y:cy0 + Math.sin(a)*rr*.8, rx:R*(.15 + Math.random()*.6)*(1 - rr/(R*3)), ry:R*(.1 + Math.random()*.3), rot:a, v:Math.random() < .3 ? S*(.1 + Math.random()*.4) : 0}); } }
       await new Promise(res => { const fr = now => { const k = (now - t0)/1000; c.fillStyle = "#000"; c.fillRect(0, 0, w, h);
           const split = Math.min(1, k*1.6), sz = S*(1.05 + k*.3);
           CREATURE.head(c, w/2 + (Math.random()-.5)*14, h*.5 + (Math.random()-.5)*10, sz, {lit:.8, grin:1, tilt:.05, detail:true});
-          // the jaw splits down the middle and opens sideways
           const top = h*.5 + sz*.02, bot = h*.5 + sz*.6, open = split*sz*.32;
           c.fillStyle = "#1a0002"; c.beginPath(); c.moveTo(w/2, top - sz*.05); c.quadraticCurveTo(w/2 - open, (top + bot)/2, w/2 - open*.4, bot + sz*.2); c.lineTo(w/2 + open*.4, bot + sz*.2); c.quadraticCurveTo(w/2 + open, (top + bot)/2, w/2, top - sz*.05); c.fill();
           const inner = c.createLinearGradient(w/2 - open, 0, w/2 + open, 0); inner.addColorStop(0, "#7a0710"); inner.addColorStop(.5, "#120001"); inner.addColorStop(1, "#7a0710");
@@ -2529,235 +2628,150 @@ function floorOne(opts={}){
       c.fillStyle = "#000"; c.fillRect(0, 0, w, h); await new Promise(r => setTimeout(r, 500)); ov.remove();
       await taking("it caught you on floor 9.");
       if(!live()) return;
-      P.x = checkpoint.x; P.y = checkpoint.y; P.a = checkpoint.a; P.hidden = false; fl = true; if(btnLight) btnLight.classList.add("on");
-      const far = WAY.map(([x,y]) => [x+.5, y+.5]).sort((a,b) => Math.hypot(b[0]-P.x, b[1]-P.y) - Math.hypot(a[0]-P.x, a[1]-P.y))[0];
-      C.x = far[0]; C.y = far[1]; C.mode = hasCard ? "investigate" : "patrol"; C.tgt = hasCard ? [Math.floor(P.x), Math.floor(P.y)] : null; C.grace = 6; C.path = [];
-      if(scripted.elevCalled){ scripted.elevCalled = 0; setObj("Get to the elevator and call it again."); }
-      last = performance.now(); caught = false; say(TAKEN.letters.length ? "Look at your hand." : "...", 3, "n");
+      P.x = checkpoint.x; P.z = checkpoint.z; P.yaw = checkpoint.yaw; P.pitch = 0; P.hidden = null; fl = true; if(btnLight) btnLight.classList.add("on");
+      const far = WAY.slice().sort((a,b) => Math.hypot(b[0]-P.x, b[1]-P.z) - Math.hypot(a[0]-P.x, a[1]-P.z))[0];
+      C.x = far[0]; C.z = far[1]; C.mode = hasCard ? "investigate" : "patrol"; C.tgt = hasCard ? [Math.floor(P.x/CELL), Math.floor(P.z/CELL)] : null; C.grace = 6; C.path = [];
+      if(scripted.elevCalled && !scripted.elevOpen){ scripted.elevCalled = 0; scripted.elevSent = false; panel.material.color.set(0xff2a1a); drawInd("B2"); setObj("Get to the elevator and call it again."); }
+      last = performance.now(); caught = false; if(TAKEN.letters.length) say("Look at your hand.", 3, "n");
+    }
+
+    /* ---------- the creature's brain ---------- */
+    function creature(dt){
+      if(C.grace > 0) C.grace -= dt;
+      const d = Math.hypot(C.x - P.x, C.z - P.z), see = los(C.x, C.z, P.x, P.z), ang = relAng(C.x, C.z);
+      if(C.mode === "hidden"){ CR.visible = false; return; }
+      CR.visible = true;
+      if(C.mode === "script"){ C.x += 2.4*dt; C.yaw = -Math.PI/2; if(Math.random() < dt*2) crack(d, ang); C.step -= dt; if(C.step <= 0){ C.step = .6; footstep(d, ang, false); }
+        if(C.x > 41.5){ C.mode = "patrol"; C.x = 39; C.z = 27; C.grace = 4; } return; }
+      if(C.grace <= 0 && !P.hidden){
+        const inBeam = fl && Math.abs(ang) < .5 && Math.abs(P.pitch) < .7, sees = see && (d < (fl ? 15 : 3.6) || (inBeam && d < 22));
+        const moving = Math.abs(stick.x) + Math.abs(stick.y) > .15 || K.w || K.s || K.a || K.d || K.arrowup || K.arrowdown;
+        const hears = K.shift && P.stamina > 0 && moving && d < 18;
+        if(sees || hears){ if(C.mode !== "hunt"){ AU.shriek(); AU.duck(.25); crack(d, ang); } C.mode = "hunt"; C.lastX = P.x; C.lastZ = P.z; C.searchT = 0; } }
+      if(P.hidden && C.mode === "hunt" && !(see && d < 1.6)){ C.mode = "search"; C.searchT = 0; }
+      let target = null, sp = 1.8;
+      if(C.mode === "patrol"){ const w = WAY[C.wi]; target = [Math.floor(w[0]/CELL), Math.floor(w[1]/CELL)]; if(Math.hypot(w[0] - C.x, w[1] - C.z) < .6) C.wi = (C.wi + 1 + (Math.random() < .3 ? 2 : 0)) % WAY.length; }
+      if(C.mode === "investigate"){ target = C.tgt; sp = 2.6; if(target && Math.floor(C.x/CELL) === target[0] && Math.floor(C.z/CELL) === target[1]){ C.mode = "search"; C.searchT = 0; } }
+      if(C.mode === "hunt"){ target = [Math.floor(C.lastX/CELL), Math.floor(C.lastZ/CELL)]; sp = 4.3;
+        if(see && !P.hidden){ C.lastX = P.x; C.lastZ = P.z; } else if(Math.floor(C.x/CELL) === target[0] && Math.floor(C.z/CELL) === target[1]){ C.mode = "search"; C.searchT = 0; } }
+      if(C.mode === "search"){ C.searchT += dt; sp = 0; if(Math.random() < dt*1.2) crack(d, ang); if(C.searchT > 5){ C.mode = "patrol"; } }
+      if(target && sp){ C.pt -= dt; if(C.pt <= 0 || !C.path.length){ C.pt = .35; C.path = bfs(Math.floor(C.x/CELL), Math.floor(C.z/CELL), target[0], target[1]); }
+        let tx, tz; if(C.mode === "hunt" && see && !P.hidden && d < 3){ tx = P.x; tz = P.z; } else if(C.path.length){ tx = C.path[0][0]*CELL + 1; tz = C.path[0][1]*CELL + 1; }
+        if(tx !== undefined){ const dx = tx - C.x, dz = tz - C.z, dd = Math.hypot(dx, dz); if(dd < .15){ if(C.path.length) C.path.shift(); } else { C.x += dx/dd*sp*dt; C.z += dz/dd*sp*dt; C.yaw = Math.atan2(dx, dz); } } }
+      C.step -= dt; if(C.step <= 0 && sp){ C.step = C.mode === "hunt" ? .28 : .62; footstep(d, ang, C.mode === "hunt"); }
+      if(Math.random() < dt*.3) crack(d, ang);
+      if(d < 1.0 && !caught && (!P.hidden || C.mode === "hunt")) getCaught();
     }
 
     /* ---------- the loop ---------- */
-    let last = performance.now(), paused = false, stepT = 0, heardT = 0;
-    const frame = now => {
+    let last = performance.now(), stepT = 0, heardT = 0;
+    const tmp = new T.Vector3();
+    function frame(now){
       if(!live()){ cleanup(); return; }
       const dt = Math.min(.05, (now - last)/1000); last = now;
       if(!paused && !caught && !done) update(dt);
-      draw(dt);
+      draw(dt, now/1000);
       requestAnimationFrame(frame);
-    };
+    }
     function update(dt){
       t += dt; subT -= dt; if(subT <= 0) sub = null;
-      /* look + move */
-      P.a += (lookDX*.0042); lookDX = 0;
-      if(K.arrowleft || K.q) P.a -= 2.2*dt; if(K.arrowright) P.a += 2.2*dt;
+      P.yaw -= lookDX*.0032; P.pitch = Math.max(-1.35, Math.min(1.35, P.pitch - lookDY*.0032)); lookDX = lookDY = 0;
+      if(K.arrowleft) P.yaw += 2*dt; if(K.arrowright) P.yaw -= 2*dt;
       let fwd = (K.w || K.arrowup ? 1 : 0) - (K.s || K.arrowdown ? 1 : 0) - stick.y, str = (K.d ? 1 : 0) - (K.a ? 1 : 0) + stick.x;
       if(Math.abs(fwd) < .15) fwd = 0; if(Math.abs(str) < .15) str = 0;
-      const moving = !P.hidden && (fwd || str);
-      const running = moving && K.shift && P.stamina > 0;
+      const moving = !P.hidden && (fwd || str), running = moving && K.shift && P.stamina > 0;
       P.stamina = Math.max(0, Math.min(1, P.stamina + (running ? -dt/4 : dt/6)));
-      if(moving){ const sp = (running ? 3.6 : 2.1)*dt, ca = Math.cos(P.a), sa = Math.sin(P.a);
-        const vx = (ca*fwd - sa*str)*sp, vy = (sa*fwd + ca*str)*sp, r = .22;
-        if(!solid(P.x + vx + Math.sign(vx)*r, P.y)) P.x += vx; if(!solid(P.x, P.y + vy + Math.sign(vy)*r)) P.y += vy;
-        P.bob += dt*(running ? 13 : 8); stepT -= dt; if(stepT <= 0){ stepT = running ? .3 : .5; AU.noiseAt(AU.ctx ? AU.ctx.currentTime : 0, .07, "lowpass", 360, running ? .14 : .06, .002, .06); } }
-      P.eye += ((P.hidden ? .2 : .5) - P.eye)*Math.min(1, dt*6);
-      /* flashlight flicker; it gets worse the more of you it has */
-      flickT -= dt; if(flickT <= 0){ flickT = .04 + Math.random()*.25; flick = Math.random() < .05 + TAKEN.letters.length*.04 ? .25 + Math.random()*.5 : 1; }
-      /* the creature */
+      if(moving){ const sp = (running ? 5.6 : 3.2)*dt, fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
+        let mx = (fx*fwd + rx*str), mz = (fz*fwd + rz*str); const m = Math.hypot(mx, mz); if(m > 1){ mx /= m; mz /= m; }
+        const r = .35, vx = mx*sp, vz = mz*sp;
+        if(!solid(P.x + vx + Math.sign(vx)*r, P.z) && !solid(P.x + vx + Math.sign(vx)*r, P.z + r*.7) && !solid(P.x + vx + Math.sign(vx)*r, P.z - r*.7)) P.x += vx;
+        if(!solid(P.x, P.z + vz + Math.sign(vz)*r) && !solid(P.x + r*.7, P.z + vz + Math.sign(vz)*r) && !solid(P.x - r*.7, P.z + vz + Math.sign(vz)*r)) P.z += vz;
+        P.bob += dt*(running ? 12 : 8); stepT -= dt; if(stepT <= 0){ stepT = running ? .3 : .5; AU.noiseAt(AU.ctx ? AU.ctx.currentTime : 0, .07, "lowpass", 360, running ? .14 : .05, .002, .06); } }
+      flickT -= dt; if(flickT <= 0){ flickT = .04 + Math.random()*.25; flick = Math.random() < .04 + TAKEN.letters.length*.04 ? .2 + Math.random()*.5 : 1; }
       creature(dt);
       /* scripted moments */
-      if(!scripted.hint && t > 2){ scripted.hint = true; say(touch ? "Left thumb: move. Drag to look. LIGHT toggles your flashlight. RUN is loud." : "WASD to move, drag the mouse to look. F: flashlight. Shift: run (loud). E: action.", 7, "n"); }
-      if(!scripted.glimpse && (P.y > 3.4 || t > 25)){ scripted.glimpse = true; C.mode = "script"; C.x = 7.5; C.y = 5.5; }
-      if(!scripted.phone && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.y - P.y) < 4 && !hasCard){ scripted.phone = true; AU.whisper("please hold"); say("Someone is sitting at the desk. She's holding the phone to her ear. She hasn't moved.", 5, "n"); }
-      for(const m of monitors){ if(!m.said && Math.hypot(m.x - P.x, m.y - P.y) < 1.7){ m.said = true; const lines = [
+      if(!scripted.hint && t > 1.5){ scripted.hint = true; say(touch ? "Left thumb moves. Drag anywhere to look around. LIGHT turns the flashlight on and off. RUN is loud." : "WASD to move. Click and move the mouse to look. F: flashlight. Shift: run (it's loud). E: action.", 8, "n"); }
+      if(!scripted.glimpse && (P.z > 7 || t > 25)){ scripted.glimpse = true; C.mode = "script"; C.x = 15; C.z = 11; }
+      if(!scripted.phone && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 7 && !hasCard){ scripted.phone = true; AU.whisper("please hold"); say("Someone is sitting at the desk. She's holding the phone to her ear. She hasn't moved.", 5, "n"); }
+      for(const m of monitors){ if(!m.said && Math.hypot(m.x - P.x, m.z - P.z) < 2.6){ m.said = true; const lines = [
           "you're awake. good. marisol's office is through the gap at the bottom of this room. she has the elevator card. — s.",
           "it sees the light before it sees you. if it gets close, turn the light off. — s.",
           "don't run unless you have to. it hears running. — s.",
           "if it's coming, get under a desk. when it's right next to you, hold your breath. — s.",
-          "the printer has been printing names since 2019. it's on yours now. — s."];
+          "listen. you'll hear it before you see it. the marks on the edge of your screen show where the sound came from. — s."];
           say(lines[monitors.indexOf(m) % lines.length], 6); AU.notif(); } }
-      if(!scripted.printer && P.x > 17 && P.y < 4){ scripted.printer = true; AU.scrape(); say("A printer in the corner is printing. Every page has your name on it. The later pages are wet.", 5, "n"); }
-      /* the elevator */
+      if(!scripted.printer && P.x > 34 && P.z < 8){ scripted.printer = true; AU.scrape(); say("A printer in the corner is printing. Every page has your name on it. The later pages are wet.", 5, "n"); }
       if(scripted.elevCalled && !scripted.elevOpen){ const left = 14 - (t - scripted.elevCalled);
-        if(left < 9 && C.mode !== "hunt" && !scripted.elevSent){ scripted.elevSent = true; C.x = 2.5; C.y = 13.5; C.mode = "investigate"; C.tgt = [elev.x - 1, elev.y]; C.grace = 0; C.path = []; AU.knock(-.9, 3, true); say("something is coming down the corridor. turn your light off. stay still. — s.", 6); }
-        if(left <= 0){ scripted.elevOpen = true; grid[elev.y][elev.x] = 0; AU.chime(); setObj("Get in."); say("The doors open.", 3, "n"); } }
-      if(scripted.elevOpen && Math.floor(P.x) === elev.x && Math.floor(P.y) === elev.y){ done = true; finish(); }
-      /* heartbeat / breath from distance */
-      const d = Math.hypot(C.x - P.x, C.y - P.y);
-      AU.heartbeat(C.mode === "script" || C.mode === "hidden" ? 0 : d < 9 ? Math.round(60 + (9 - d)*12) : 0);
-      if(d < 2.6 && C.mode !== "script" && C.mode !== "hidden") AU.breath(true); else if(d > 4) AU.breath(false);
-      /* hiding + breath */
+        drawInd(["B2","B1","G","1","2","3","4","5","6","7","8","9"][Math.max(0, Math.min(11, Math.floor((14 - left)/14*11)))]);
+        if(left < 9 && C.mode !== "hunt" && !scripted.elevSent){ scripted.elevSent = true; C.x = 5; C.z = 27; C.mode = "investigate"; C.tgt = [elev.gx - 1, elev.gy]; C.grace = 0; C.path = []; AU.knock(-.9, 3, true);
+          say("something is coming down the corridor. turn your light off. stay still. — s.", 6); }
+        if(left <= 0){ scripted.elevOpen = true; grid[elev.gy][elev.gx] = 0; AU.chime(); inside.intensity = 1.8; setObj("Get in."); say("The doors open.", 3, "n"); } }
+      if(scripted.elevOpen){ doorL.position.z = Math.max(ez - 1.4, doorL.position.z - dt*1.2); doorR.position.z = Math.min(ez + 1.4, doorR.position.z + dt*1.2); }
+      if(scripted.elevOpen && P.x > ex + .4){ done = true; finish(); }
+      const d = Math.hypot(C.x - P.x, C.z - P.z), active = C.mode !== "script" && C.mode !== "hidden";
+      AU.heartbeat(active && d < 16 ? Math.round(60 + (16 - d)*6) : 0);
+      if(active && d < 4.5) AU.breath(true); else if(d > 7) AU.breath(false);
       if(P.hidden){
-        const close = d < 1.6 && C.mode !== "script" && C.mode !== "hidden";
-        btnBreath.style.display = close || P.holding ? "block" : "none";
-        if(P.holding){ P.breath -= dt/5; if(P.breath <= 0){ P.holding = false; P.breath = 0; AU.tone(300, "sawtooth", .01, .12, .3, 0); say("You gasp.", 2, "n"); C.mode = "hunt"; C.lastX = P.x; C.lastY = P.y; P.hidden = false; } }
-        else { P.breath = Math.min(1, P.breath + dt/3); if(close && heardT <= 0){ heardT = 1.2; if(Math.random() < .55){ say("It heard you breathing.", 2, "n"); C.mode = "hunt"; C.lastX = P.x; C.lastY = P.y; P.hidden = false; } } }
+        const close = active && d < 2.8; btnBreath.style.display = close || P.holding ? "block" : "none";
+        if(P.holding){ P.breath -= dt/5; if(P.breath <= 0){ P.holding = false; P.breath = 0; AU.tone(300, "sawtooth", .01, .12, .3, 0); say("You gasp.", 2, "n"); C.mode = "hunt"; C.lastX = P.x; C.lastZ = P.z; P.x = P.px; P.z = P.pz; P.hidden = null; } }
+        else { P.breath = Math.min(1, P.breath + dt/3); if(close && heardT <= 0){ heardT = 1.2; if(Math.random() < .55){ say("It heard you breathing.", 2, "n"); C.mode = "hunt"; C.lastX = P.x; C.lastZ = P.z; P.x = P.px; P.z = P.pz; P.hidden = null; } } }
         heardT -= dt;
       } else btnBreath.style.display = "none";
-      const ctxLabel = context(); btnAct.style.display = ctxLabel ? "block" : "none"; btnAct.textContent = ctxLabel || "";
+      const label = context(); btnAct.style.display = label ? "block" : "none"; btnAct.textContent = label || "";
     }
-    function creature(dt){
-      C.ft += dt; if(C.ft > .38){ C.ft = 0; C.frame = 1 - C.frame; }
-      if(C.grace > 0) C.grace -= dt;
-      const d = Math.hypot(C.x - P.x, C.y - P.y), see = los(C.x, C.y, P.x, P.y);
-      if(C.mode === "hidden") return;
-      if(C.mode === "script"){                                    // the first time you see it: crossing the room, not looking at you
-        C.x += 1.5*dt; if(Math.random() < dt*2.5) crack(d, Math.sin(angTo(C.x, C.y)));
-        if(C.x > 20.2){ C.mode = "patrol"; C.x = 19.5; C.y = 13.5; C.grace = 4; } stepCheck(d, .62, false); return; }
-      if(C.grace <= 0 && !P.hidden){
-        const inBeam = fl && Math.abs(angTo(C.x, C.y)) < .45, sees = see && (d < (fl ? 8.5 : 2.2) || (inBeam && d < 11));
-        const hears = (K.shift && P.stamina > 0 && (Math.abs(stick.y) + Math.abs(stick.x) > .15 || K.w || K.s || K.a || K.d || K.arrowup || K.arrowdown) && d < 9);
-        if(sees || hears){ if(C.mode !== "hunt"){ AU.shriek(); AU.duck(.25); crack(d, 0); } C.mode = "hunt"; C.lastX = P.x; C.lastY = P.y; C.searchT = 0; }
-      }
-      if(P.hidden && C.mode === "hunt" && !(see && d < 1.2)){ C.mode = "search"; C.searchT = 0; }
-      let target = null, sp = .95;
-      if(C.mode === "patrol"){ const w = WAY[C.wi]; target = w; if(Math.floor(C.x) === w[0] && Math.floor(C.y) === w[1]) C.wi = (C.wi + 1 + (Math.random() < .3 ? 2 : 0)) % WAY.length; }
-      if(C.mode === "investigate"){ target = C.tgt; sp = 1.35; if(target && Math.floor(C.x) === target[0] && Math.floor(C.y) === target[1]){ C.mode = "search"; C.searchT = 0; } }
-      if(C.mode === "hunt"){ target = [Math.floor(C.lastX), Math.floor(C.lastY)]; sp = 2.45; if(!see || P.hidden){ if(Math.floor(C.x) === target[0] && Math.floor(C.y) === target[1]){ C.mode = "search"; C.searchT = 0; } } else { C.lastX = P.x; C.lastY = P.y; } }
-      if(C.mode === "search"){ C.searchT += dt; sp = .4; target = null; if(Math.random() < dt) crack(d, Math.sin(angTo(C.x, C.y))); if(C.searchT > 4.5){ C.mode = "patrol"; } }
-      if(target){ C.pt -= dt; if(C.pt <= 0 || !C.path.length){ C.pt = .35; C.path = bfs(Math.floor(C.x), Math.floor(C.y), target[0], target[1]); }
-        if(C.path.length){ const [tx, ty] = C.path[0], dx = tx + .5 - C.x, dy = ty + .5 - C.y, dd = Math.hypot(dx, dy); if(dd < .08) C.path.shift(); else { C.x += dx/dd*sp*dt; C.y += dy/dd*sp*dt; } } }
-      stepCheck(d, C.mode === "hunt" ? .3 : .62, C.mode === "hunt");
-      if(Math.random() < dt*.25) crack(d, Math.sin(angTo(C.x, C.y)));
-      if(d < .62 && !caught && (!P.hidden || C.mode === "hunt")) getCaught();
+    function draw(dt, time){
+      const eyeH = P.hidden ? .55 : 1.62 + (P.hidden ? 0 : Math.sin(P.bob)*.03);
+      camera.position.set(P.x, eyeH, P.z); camera.rotation.set(P.hidden ? Math.max(-.5, Math.min(.35, P.pitch)) : P.pitch, P.yaw, 0);
+      hand.position.set(.26 + Math.cos(P.bob*.5)*.01, -.3 + Math.abs(Math.sin(P.bob*.5))*.012 - (P.hidden ? .1 : 0), -.5);
+      const on = fl && !P.hidden; flash.intensity = on ? 1.6*flick : 0; lens.material.color.set(on ? 0xfff2d0 : 0x222222);
+      drips.forEach((dd, i) => { const k = ((time*.3 + i*.33) % 1); dd.scale.y = .02 + k*.2; dd.position.y = -.06 - k*.1; });
+      updateHand();
+      /* the creature in the world */
+      const d = Math.hypot(C.x - P.x, C.z - P.z);
+      CR.position.set(C.x, 0, C.z); CR.rotation.y = C.yaw; poseCreature(C.mode, dt, d);
+      CR.updateMatrixWorld(true); face.lookAt(camera.getWorldPosition(tmp));   // its face always turns to you
+      eyes.forEach(e => e.visible = C.mode !== "hidden" && (C.mode === "hunt" || d < 18));
+      /* lights stutter when it is near them */
+      for(const L of LIGHTS){ const ld = Math.hypot(L.position.x - C.x, L.position.z - C.z); L.intensity = L.base*(ld < 6 && Math.random() < .3 ? Math.random()*.3 : (Math.sin(time*13 + L.position.x) > -.85 ? 1 : .3)); }
+      for(const m of monitors){ if(m.screen){ const md2 = Math.hypot(m.x - C.x, m.z - C.z); m.screen.material.color.setScalar(md2 < 5 && Math.random() < .35 ? .05 : 1); } }
+      renderer.render(scene, camera);
+      drawHud(dt, d);
     }
-    function stepCheck(d, every, heavy){ C.step -= 1/60; if(C.step <= 0 && d < 14){ C.step = every; footstep(d, Math.sin(angTo(C.x, C.y)), heavy); } }
-
-    /* ---------- the renderer ---------- */
-    function draw(dt){
-      const dirX = Math.cos(P.a), dirY = Math.sin(P.a), FOV = .66, plX = -dirY*FOV, plY = dirX*FOV;
-      const eye = P.eye + (P.hidden ? 0 : Math.sin(P.bob)*.008), hor = RH/2, dmg = TAKEN.letters.length;
-      const flOn = fl && !P.hidden, fI = flOn ? .95*flick : 0, cxs = RW/2, cys = RH*.52, bw = RW*.36, bh = RH*.42;
-      const tint = [1, .93 - dmg*.06, .8 - dmg*.1];
-      const time = performance.now()/1000;
-      const lit = LIGHTS.map(L => ({...L, i: L.i*(L.flick ? (Math.sin(time*13 + L.x) > -.7 ? 1 : .25) : 1)}));
-      const lightRGB = (wx, wy, dist, sx, sy, out) => {
-        let r = .028, g = .028, b = .034;
-        if(fI){ const ux = (sx - cxs)/bw, uy = (sy - cys)/bh, cone = Math.max(0, 1 - (ux*ux + uy*uy)), spill = Math.max(0, 1 - (ux*ux + uy*uy)*.22)*.18;
-          const f = (cone*cone*1.1 + spill*.6)*fI/(1 + dist*dist*.2); r += f*tint[0]; g += f*tint[1]; b += f*tint[2]; }
-        for(const L of lit){ const dx = wx - L.x, dy = wy - L.y, a = L.i/(1 + (dx*dx + dy*dy)*L.k); r += a*L.r; g += a*L.g; b += a*L.b; }
-        const fog = 1/(1 + dist*dist*.035); out[0] = r*fog; out[1] = g*fog; out[2] = b*fog; };
-      const lv = [0,0,0];
-      /* floor and ceiling */
-      const rx0 = dirX - plX, ry0 = dirY - plY, rx1 = dirX + plX, ry1 = dirY + plY;
-      for(let y=0;y<RH;y++){
-        const floorRow = y > hor, p = floorRow ? (y - hor) : (hor - y); if(p < 1){ for(let x=0;x<RW;x++) px[y*RW+x] = 0xff000000; continue; }
-        const rowDist = (floorRow ? eye : (1 - eye))*RH/p, sx = rowDist*(rx1 - rx0)/RW, sy = rowDist*(ry1 - ry0)/RW;
-        let fx = P.x + rowDist*rx0, fy = P.y + rowDist*ry0; const tex = floorRow ? F1TEX.carpet : F1TEX.ceil;
-        for(let x=0;x<RW;x++){
-          const tx = (Math.floor(fx*64) & 63), ty = (Math.floor(fy*64) & 63), i = ty*64 + tx;
-          if(x % 2 === 0) lightRGB(fx, fy, rowDist, x, y, lv);
-          const n = .9 + Math.random()*.2;
-          const R = Math.min(255, tex.r[i]*lv[0]*n*1.6), G = Math.min(255, tex.g[i]*lv[1]*n*1.6), B = Math.min(255, tex.b[i]*lv[2]*n*1.6);
-          px[y*RW+x] = 0xff000000 | (B << 16) | (G << 8) | R;
-          fx += sx; fy += sy; }
-      }
-      /* walls */
-      for(let x=0;x<RW;x++){
-        const camX = 2*x/RW - 1, rdx = dirX + plX*camX, rdy = dirY + plY*camX;
-        let mx = Math.floor(P.x), my = Math.floor(P.y); const ddx = Math.abs(1/(rdx || 1e-9)), ddy = Math.abs(1/(rdy || 1e-9));
-        let sdx = rdx < 0 ? (P.x - mx)*ddx : (mx + 1 - P.x)*ddx, sdy = rdy < 0 ? (P.y - my)*ddy : (my + 1 - P.y)*ddy, side = 0, hit = false, n = 0;
-        while(!hit && n++ < 64){ if(sdx < sdy){ sdx += ddx; mx += rdx < 0 ? -1 : 1; side = 0; } else { sdy += ddy; my += rdy < 0 ? -1 : 1; side = 1; }
-          if(mx < 0 || my < 0 || mx >= MW || my >= MH || grid[my][mx] === 1 || grid[my][mx] === 2) hit = true; }
-        const dist = Math.max(.05, side === 0 ? sdx - ddx : sdy - ddy); zbuf[x] = dist;
-        let wx = side === 0 ? P.y + dist*rdy : P.x + dist*rdx; wx -= Math.floor(wx);
-        const tex = (mx >= 0 && my >= 0 && mx < MW && my < MH) ? wallTexAt(mx, my) : F1TEX.wall, tx = Math.floor(wx*64) & 63;
-        const lineH = RH/dist, top = Math.floor(hor - (1 - eye)*lineH), bot = Math.floor(hor + eye*lineH);
-        const hx = P.x + rdx*dist, hy = P.y + rdy*dist, shade = side ? .72 : 1;
-        for(let y=Math.max(0, top); y<Math.min(RH, bot); y++){
-          if((y - top) % 3 === 0) lightRGB(hx, hy, dist, x, y, lv);
-          const ty = Math.floor((y - top)/(bot - top)*64) & 63, i = ty*64 + tx, nn = (.92 + Math.random()*.16)*shade*1.6;
-          const R = Math.min(255, tex.r[i]*lv[0]*nn), G = Math.min(255, tex.g[i]*lv[1]*nn), B = Math.min(255, tex.b[i]*lv[2]*nn);
-          px[y*RW+x] = 0xff000000 | (B << 16) | (G << 8) | R; }
-      }
-      /* sprites, far to near */
-      const list = sprites.slice();
-      if(C.mode !== "hidden") list.push({x:C.x, y:C.y, tex:F1SPR.creature[C.mode === "search" ? 2 : Math.hypot(C.x-P.x, C.y-P.y) < 1.6 ? 3 : C.frame], sw:.5, sh:1.18, creature:true});
-      if(!hasCard && marisolAt){ /* the card glints at her wrist */ }
-      list.forEach(s => s.dd = (s.x - P.x)**2 + (s.y - P.y)**2); list.sort((a,b) => b.dd - a.dd);
-      const inv = 1/(plX*dirY - dirX*plY);
-      for(const s of list){
-        const rx = s.x - P.x, ry = s.y - P.y, tX = inv*(dirY*rx - dirX*ry), tY = inv*(-plY*rx + plX*ry); if(tY <= .12) continue;
-        const scx = Math.floor(RW/2*(1 + tX/tY)), base = hor + eye*RH/tY, hgt = s.sh*RH/tY, wid = hgt*(s.tex.w/s.tex.h);
-        const top = s.flat ? base - hgt*.5 : base - hgt, sw = s.flat ? s.sw*RH/tY*2 : wid, x0 = Math.floor(scx - sw/2), x1 = Math.floor(scx + sw/2);
-        const y0 = Math.floor(top), y1 = Math.floor(s.flat ? base + hgt*.5 : base);
-        const dist = Math.sqrt(s.dd); lightRGB(s.x, s.y, dist, scx, (y0 + y1)/2, lv);
-        const glow = s.creature ? .02 : 0;
-        for(let x=Math.max(0,x0); x<Math.min(RW,x1); x++){ if(zbuf[x] < tY) continue;
-          const tx = Math.floor((x - x0)/(x1 - x0)*s.tex.w);
-          for(let y=Math.max(0,y0); y<Math.min(RH,y1); y++){ const ty = Math.floor((y - y0)/(y1 - y0)*s.tex.h), i = ty*s.tex.w + tx;
-            if(s.tex.a[i] < 128) continue;
-            let R = s.tex.r[i], G = s.tex.g[i], B = s.tex.b[i];
-            const isEye = s.creature && R > 235 && G > 225;            // its eyes catch any light at all
-            const cap = v => Math.min(1.05, v), kr = isEye ? Math.max(.6, lv[0]) : cap((lv[0] + glow)*1.5), kg = isEye ? Math.max(.6, lv[1]) : cap((lv[1] + glow)*1.5), kb = isEye ? Math.max(.6, lv[2]) : cap((lv[2] + glow)*1.5);
-            const nz = .9 + Math.random()*.2; R = Math.min(255, R*kr*nz); G = Math.min(255, G*kg*nz); B = Math.min(255, B*kb*nz);
-            px[y*RW+x] = 0xff000000 | (B << 16) | (G << 8) | R; } }
-      }
-      octx.putImageData(img, 0, 0);
-      ctx.imageSmoothingEnabled = false; ctx.drawImage(off, 0, 0, W, H); ctx.imageSmoothingEnabled = true;
-      /* hiding: the underside of the desk fills the top of your view */
-      if(P.hidden){ ctx.fillStyle = "#050403"; ctx.fillRect(0, 0, W, H*.36); ctx.fillRect(0, 0, W*.1, H); ctx.fillRect(W*.9, 0, W*.1, H);
-        const g = ctx.createLinearGradient(0, H*.36, 0, H*.5); g.addColorStop(0, "rgba(5,4,3,1)"); g.addColorStop(1, "rgba(5,4,3,0)"); ctx.fillStyle = g; ctx.fillRect(0, H*.36, W, H*.14); }
-      /* the hand */
-      drawHand(dmg, flOn);
-      /* film grain + vignette, heavier when it is close */
-      const dC = Math.hypot(C.x - P.x, C.y - P.y), fear = C.mode === "script" || C.mode === "hidden" ? 0 : Math.max(0, 1 - dC/6);
-      const vg = ctx.createRadialGradient(W/2, H/2, H*(.32 - fear*.12), W/2, H/2, H*.85); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, `rgba(${Math.round(fear*40)},0,0,${.6 + fear*.3})`);
-      ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
-      if(fear > .5 && Math.random() < fear*.15){ ctx.fillStyle = "rgba(255,255,255,.04)"; ctx.fillRect(0, Math.random()*H, W, 2 + Math.random()*20); }
-      hud(dmg);
+    function drawHud(dt, d){
+      const c = hc; c.clearRect(0, 0, W, H);
+      const active = C.mode !== "script" && C.mode !== "hidden", fear = active ? Math.max(0, 1 - d/9) : 0;
+      if(fear > 0 || P.hidden){ const vg = c.createRadialGradient(W/2, H/2, H*(.35 - fear*.15), W/2, H/2, H*.9); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, `rgba(${Math.round(70*fear)},0,0,${.35 + fear*.45})`); c.fillStyle = vg; c.fillRect(0, 0, W, H); }
+      if(fear > .5 && Math.random() < fear*.12){ c.fillStyle = "rgba(255,255,255,.035)"; c.fillRect(0, Math.random()*H, W, 2 + Math.random()*18); }
+      /* where the sounds came from */
+      for(let i=marks.length-1;i>=0;i--){ const m = marks[i]; m.life -= dt*.9; if(m.life <= 0){ marks.splice(i, 1); continue; }
+        const a = m.ang - Math.PI/2, rx = W*.42, ry = H*.4, x = W/2 + Math.cos(a)*rx, y = H/2 + Math.sin(a)*ry, al = m.life*m.loud;
+        c.save(); c.translate(x, y); c.rotate(a + Math.PI/2); c.strokeStyle = m.kind === "crack" ? `rgba(255,190,190,${al*.8})` : `rgba(255,60,80,${al})`; c.lineWidth = 3 + m.loud*5; c.lineCap = "round";
+        c.beginPath(); c.arc(0, 30, 34, -Math.PI*.5 - .35, -Math.PI*.5 + .35); c.stroke(); c.restore(); }
+      /* objective, name, stamina, breath, elevator, subtitles */
+      c.font = "600 13px ui-monospace,Menlo,monospace"; c.textAlign = "left"; const obj = W < 700 && objective.length > 60 ? objective.slice(0, 58) + "…" : objective;
+      c.fillStyle = "rgba(0,0,0,.5)"; c.fillRect(14, 14, Math.min(W - 40, c.measureText(obj).width + 24), 30); c.fillStyle = "#e9e2d8"; c.fillText(obj, 26, 34);
+      c.textAlign = "right"; c.fillStyle = "#cfc6c0"; c.fillText(fullName().toUpperCase(), W - 18, 34);
+      if(P.stamina < .98){ c.fillStyle = "rgba(255,255,255,.12)"; c.fillRect(W/2 - 60, H - 14, 120, 4); c.fillStyle = "rgba(255,255,255,.55)"; c.fillRect(W/2 - 60, H - 14, 120*P.stamina, 4); }
+      if(P.hidden){ c.fillStyle = "rgba(255,45,85,.25)"; c.fillRect(W/2 - 100, H - 130, 200, 6); c.fillStyle = "#ff2d55"; c.fillRect(W/2 - 100, H - 130, 200*P.breath, 6);
+        c.textAlign = "center"; c.fillStyle = "#ffd2d8"; c.font = "600 12px ui-monospace,monospace"; c.fillText(touch ? "BREATH" : "BREATH — hold SPACE when it's close", W/2, H - 138); }
+      if(!touch && !document.pointerLockElement && t < 20){ c.textAlign = "center"; c.fillStyle = "rgba(233,226,216,.7)"; c.font = "12px ui-monospace,monospace"; c.fillText("click to look around with the mouse", W/2, H - 24); }
+      if(sub){ c.textAlign = "center"; c.font = `${sub.who === "s" ? "500" : "italic 500"} ${W < 700 ? 14 : 17}px ${sub.who === "s" ? "ui-monospace,Menlo,monospace" : "Georgia,serif"}`;
+        const words = sub.txt.split(" "), lines = []; let ln = ""; for(const w2 of words){ const tst = ln + w2 + " "; if(c.measureText(tst).width > W*.7 && ln){ lines.push(ln); ln = w2 + " "; } else ln = tst; } lines.push(ln);
+        const y0 = H*.72; lines.forEach((l, i) => { c.fillStyle = "rgba(0,0,0,.7)"; const lw = c.measureText(l).width; c.fillRect(W/2 - lw/2 - 8, y0 + i*25 - 18, lw + 16, 24);
+          c.fillStyle = sub.who === "s" ? "#7dffb0" : "#e9e2d8"; c.fillText(l.trim(), W/2, y0 + i*25); }); }
     }
-    function drawHand(dmg, on){
-      const S = Math.min(W, H), bx = W*.78 + Math.cos(P.bob*.5)*S*.012, by = H*1.02 + Math.abs(Math.sin(P.bob*.5))*S*.015 + (P.hidden ? S*.25 : 0);
-      ctx.save(); ctx.translate(bx, by); ctx.rotate(-.42);
-      const skinL = on ? .5 : .22, sk = k => `rgb(${(185*skinL*k)|0},${(150*skinL*k)|0},${(130*skinL*k)|0})`;
-      ctx.fillStyle = sk(.8); ctx.fillRect(-S*.07, -S*.08, S*.14, S*.4);                                                       // forearm
-      ctx.fillStyle = "#151515"; ctx.fillRect(-S*.035, -S*.36, S*.07, S*.26); ctx.fillStyle = "#2a2a2a"; ctx.fillRect(-S*.045, -S*.4, S*.09, S*.05);   // the flashlight
-      if(on){ ctx.fillStyle = `rgba(255,240,${200 - dmg*30},.85)`; ctx.fillRect(-S*.035, -S*.405, S*.07, S*.012); }
-      if(dmg >= 3){ ctx.fillStyle = "rgba(110,5,10,.85)"; ctx.fillRect(-S*.03, -S*.3, S*.06, S*.08); }                         // smeared on the grip
-      ctx.fillStyle = sk(1); ctx.beginPath(); ctx.ellipse(0, -S*.12, S*.075, S*.06, 0, 0, 7); ctx.fill();                         // the back of the hand
-      const fingers = [[-.045, 1], [-.015, 1], [.015, 1], [.045, 1]];
-      fingers.forEach(([fx], i) => { const gone = (dmg >= 3 && i === 0) || (dmg >= 5 && i === 1);
-        if(gone){ ctx.fillStyle = "#5a0408"; ctx.beginPath(); ctx.ellipse(S*fx, -S*.155, S*.014, S*.01, 0, 0, 7); ctx.fill(); ctx.fillStyle = "#c8b0a0"; ctx.beginPath(); ctx.arc(S*fx, -S*.157, S*.004, 0, 7); ctx.fill(); return; }
-        ctx.fillStyle = sk(1.05); ctx.beginPath(); ctx.ellipse(S*fx, -S*.18, S*.015, S*.032, 0, 0, 7); ctx.fill();
-        const nail = i === 0 && dmg >= 1 ? (dmg >= 2 ? "#5a0408" : "#0b0806") : sk(1.25);
-        ctx.fillStyle = nail; ctx.beginPath(); ctx.ellipse(S*fx, -S*.205, S*.009, S*.01, 0, 0, 7); ctx.fill(); });
-      ctx.fillStyle = sk(.95); ctx.beginPath(); ctx.ellipse(S*.07, -S*.15, S*.016, S*.04, -.6, 0, 7); ctx.fill();                // thumb
-      if(dmg >= 2){ ctx.strokeStyle = "rgba(20,10,30,.6)"; ctx.lineWidth = Math.max(1, S*.003);
-        for(let i=0;i<4;i++){ ctx.beginPath(); ctx.moveTo(-S*.05 + i*S*.03, -S*.08); ctx.quadraticCurveTo(-S*.04 + i*S*.03, -S*.12, -S*.045 + i*S*.032, -S*.16); ctx.stroke(); } }
-      if(dmg >= 3){ ctx.fillStyle = "#6a0509"; const tt = performance.now()/1000;                                                  // it runs down your wrist
-        for(let i=0;i<3;i++){ const len = ((tt*.3 + i*.33) % 1)*S*.25; ctx.fillRect(-S*.04 + i*S*.012, -S*.15, S*.006, len); } }
-      ctx.restore();
-    }
-    function hud(dmg){
-      ctx.font = "600 13px ui-monospace,Menlo,monospace"; ctx.textAlign = "left"; ctx.fillStyle = "rgba(0,0,0,.55)";
-      const ow = Math.min(W - 40, ctx.measureText(objective).width + 24); ctx.fillRect(14, 14, ow, 30);
-      ctx.fillStyle = "#e9e2d8"; ctx.fillText(objective.length > 90 && W < 700 ? objective.slice(0, 60) + "…" : objective, 26, 34);
-      ctx.textAlign = "right"; ctx.fillStyle = "#cfc6c0"; ctx.font = "600 13px ui-monospace,Menlo,monospace"; ctx.fillText(fullName().toUpperCase(), W - (touch ? 130 : 18), 34);
-      if(P.stamina < .98){ ctx.fillStyle = "rgba(255,255,255,.12)"; ctx.fillRect(W/2 - 60, H - 14, 120, 4); ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fillRect(W/2 - 60, H - 14, 120*P.stamina, 4); }
-      if(P.hidden){ ctx.fillStyle = "rgba(255,45,85,.25)"; ctx.fillRect(W/2 - 100, H - 130, 200, 6); ctx.fillStyle = "#ff2d55"; ctx.fillRect(W/2 - 100, H - 130, 200*P.breath, 6);
-        ctx.textAlign = "center"; ctx.fillStyle = "#ffd2d8"; ctx.font = "600 12px ui-monospace,monospace"; ctx.fillText(touch ? "BREATH" : "BREATH — hold SPACE when it's close", W/2, H - 138); }
-      if(scripted.elevCalled && !scripted.elevOpen){ const left = Math.max(0, Math.ceil(14 - (t - scripted.elevCalled))), fl2 = ["B2","B1","G","1","2","3","4","5","6","7","8","9"];
-        ctx.textAlign = "center"; ctx.fillStyle = "#ff5e3a"; ctx.font = "700 22px ui-monospace,monospace"; ctx.fillText("ELEVATOR ▲ " + fl2[Math.min(11, Math.floor((14 - left)/14*11))], W/2, 80); }
-      if(sub){ ctx.textAlign = "center"; ctx.font = `${sub.who === "s" ? "500" : "italic 500"} ${W < 700 ? 14 : 17}px ${sub.who === "s" ? "ui-monospace,Menlo,monospace" : "Georgia,serif"}`;
-        const words = sub.txt.split(" "), lines = []; let ln = ""; for(const w2 of words){ const tst = ln + w2 + " "; if(ctx.measureText(tst).width > W*.7 && ln){ lines.push(ln); ln = w2 + " "; } else ln = tst; } lines.push(ln);
-        const y0 = H*(P.hidden ? .62 : .74); lines.forEach((l, i) => { ctx.fillStyle = "rgba(0,0,0,.7)"; const lw = ctx.measureText(l).width; ctx.fillRect(W/2 - lw/2 - 8, y0 + i*24 - 17, lw + 16, 23);
-          ctx.fillStyle = sub.who === "s" ? "#7dffb0" : "#e9e2d8"; ctx.fillText(l.trim(), W/2, y0 + i*24); }); }
-    }
-
-    /* ---------- the end of the floor ---------- */
     async function finish(){
       AU.heartbeat(0); AU.breath(false); AU.chime();
       const ov = document.createElement("div"); ov.style.cssText = "position:fixed;inset:0;z-index:9995;background:#000;opacity:0;transition:opacity 1.2s"; document.body.appendChild(ov);
-      requestAnimationFrame(() => ov.style.opacity = "1"); await new Promise(r => setTimeout(r, 1400));
-      ov.remove(); cleanup(); resolve(true);
+      requestAnimationFrame(() => ov.style.opacity = "1"); await new Promise(r => setTimeout(r, 1400)); ov.remove(); cleanup(); resolve(true);
     }
     function cleanup(){
       removeEventListener("keydown", kd); removeEventListener("keyup", ku); removeEventListener("resize", fit);
       cv.removeEventListener("mousedown", md); removeEventListener("mousemove", mm); removeEventListener("mouseup", mu);
       try{ document.exitPointerLock && document.exitPointerLock(); }catch(e){}
-      ui.remove(); cv.style.display = "none"; AU.breath(false); AU.heartbeat(0);
+      ui.remove(); hud.remove(); renderer.dispose(); cv.remove(); AU.breath(false); AU.heartbeat(0); document.body.classList.remove("floor");
     }
-    DEV.f1 = { P, C, stick, action: () => action(), caught: () => getCaught(), get t(){ return t; }, get hasCard(){ return hasCard; }, get objective(){ return objective; } };   // test hook
+    DEV.f1 = { P, C, stick, action: () => action(), caught: () => getCaught(), get t(){ return t; }, get hasCard(){ return hasCard; }, get objective(){ return objective; }, renderer };   // test hook
     requestAnimationFrame(frame);
   });
 }
