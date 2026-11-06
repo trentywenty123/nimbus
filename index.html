@@ -2262,6 +2262,16 @@ const F1ART = {
     this.marisolFace = this.canvas(128, 160, (c, w, h) => { CREATURE.head(c, w/2, h*.5, h*.9, {lit:.55, grin:0, tilt:0, detail:true, eyes:false});
       c.fillStyle = "rgba(80,0,8,.7)"; c.fillRect(w*.22, h*.36, w*.56, h*.1); });
     this.screen = this.canvas(128, 80, (c, w, h) => { c.fillStyle = "#0d2a1c"; c.fillRect(0, 0, w, h); c.fillStyle = "#7dffb0"; for(let i=0;i<6;i++) c.fillRect(8, 10 + i*10, 30 + (i*37 % 70), 3); });
+    this.skin = this.canvas(256, 256, (c, w, h) => { c.fillStyle = "#9a8c7e"; c.fillRect(0, 0, w, h);
+      for(let i=0;i<220;i++){ c.fillStyle = `rgba(${60 + Math.random()*60|0},${40 + Math.random()*40|0},${40 + Math.random()*40|0},${.08 + Math.random()*.16})`; c.beginPath(); c.ellipse(Math.random()*w, Math.random()*h, 3 + Math.random()*18, 2 + Math.random()*10, Math.random()*3, 0, 7); c.fill(); }
+      c.strokeStyle = "rgba(50,40,70,.45)"; for(let i=0;i<26;i++){ let x = Math.random()*w, y = Math.random()*h; c.lineWidth = .5 + Math.random()*1.5; c.beginPath(); c.moveTo(x, y);
+        for(let k=0;k<6;k++){ x += (Math.random() - .5)*30; y += 8 + Math.random()*16; c.lineTo(x, y); } c.stroke(); }
+      c.fillStyle = "rgba(90,8,14,.6)"; for(let i=0;i<10;i++){ const x = Math.random()*w; c.fillRect(x, Math.random()*h*.5, 1.5 + Math.random()*2, 30 + Math.random()*90); } });
+    this.drawers = this.canvas(128, 256, (c, w, h) => { c.fillStyle = "#3d4046"; c.fillRect(0, 0, w, h); this.noise(c, w, h, 3000, .08);
+      for(let i=0;i<4;i++){ c.fillStyle = "rgba(0,0,0,.45)"; c.fillRect(6, 8 + i*62, w - 12, 2); c.fillStyle = "#8a8d92"; c.fillRect(w/2 - 16, 34 + i*62, 32, 6); } });
+    this.paper = this.canvas(64, 90, (c, w, h) => { c.fillStyle = "#cfcac0"; c.fillRect(0, 0, w, h); c.fillStyle = "rgba(40,40,40,.6)"; for(let i=0;i<12;i++) c.fillRect(6, 8 + i*6, 30 + (i*13 % 22), 2);
+      c.fillStyle = "#222"; c.font = "bold 7px monospace"; c.fillText("NIMBUS", 6, 86); });
+    this.paperB = this.canvas(64, 90, (c, w, h) => { c.drawImage(this.paper, 0, 0); c.fillStyle = "rgba(80,4,8,.85)"; c.beginPath(); c.ellipse(36, 50, 26, 30, .4, 0, 7); c.fill(); });
     this.exit = this.canvas(128, 48, (c, w, h) => { c.fillStyle = "#300"; c.fillRect(0, 0, w, h); c.fillStyle = "#ff3a2a"; c.font = "bold 30px sans-serif"; c.textAlign = "center"; c.fillText("EXIT", w/2, 35); });
   }
 };
@@ -2349,25 +2359,68 @@ function floorOne(){
     const LIGHTS = [pl(0xff2a1a, 1.4, 9, 40.6, 2.6, 28.6), pl(0xff2a1a, 1.1, 8, 23, 2.7, 17.2), pl(0xffd8a0, .9, 6, 5.6, 1.4, 18.4), pl(0x60ffa8, .7, 5, 7, 1.3, 4.6)];
     for(const [x, z, ry] of [[40.6, 27.6, -Math.PI/2], [23, 16.6, 0]]){ const s = new T.Mesh(new T.PlaneGeometry(.7, .26), new T.MeshBasicMaterial({map:tex(F1ART.exit)})); s.position.set(x - (ry ? .55 : 0), 2.75, z + (ry ? 0 : .5)); s.rotation.y = ry; scene.add(s); }
 
+    /* ---------- the clutter of a place people left in a hurry ---------- */
+    const walk = []; for(let y=0;y<MH;y++) for(let x=0;x<MW;x++) if(grid[y][x] === 0) walk.push([x, y]);
+    const mPaper = new T.MeshStandardMaterial({map:tex(F1ART.paper), roughness:.9, side:T.DoubleSide}), mPaperB = new T.MeshStandardMaterial({map:tex(F1ART.paperB), roughness:.7, side:T.DoubleSide});
+    for(let i=0;i<70;i++){ const [gx, gy] = walk[(i*37 + 11) % walk.length]; const pp = new T.Mesh(new T.PlaneGeometry(.21, .3), i % 6 === 0 ? mPaperB : mPaper);
+      pp.rotation.set(-Math.PI/2, 0, (i*1.7) % 6.28); pp.position.set(gx*CELL + .3 + (i*.37 % 1.4), .006 + (i % 5)*.001, gy*CELL + .3 + (i*.53 % 1.4)); pp.receiveShadow = true; scene.add(pp); }
+    const mKey = new T.MeshStandardMaterial({color:0x1a1a1c, roughness:.6}), mMug = new T.MeshStandardMaterial({color:0xd8d0c0, roughness:.4});
+    desks.forEach((d, i) => { box(.44, .02, .15, mKey, d.x - .05, .8, d.z + .1, scene, false);
+      if(i % 2 === 0){ const m = new T.Mesh(new T.CylinderGeometry(.04, .035, .1, 10), mMug); m.position.set(d.x + .55, .84, d.z + .12); m.castShadow = true; scene.add(m); }
+      if(i % 3 === 1) box(.24, .07, .31, mPaper, d.x - .55, .82, d.z + .05, scene); });
+    const mDrawer = new T.MeshStandardMaterial({map:tex(F1ART.drawers), roughness:.5, metalness:.3});
+    for(const [x, z, ry] of [[1.5, 9.6, Math.PI/2], [1.5, 15.4, Math.PI/2], [27, 1.5, 0], [31, 1.5, 0], [42.5, 11, -Math.PI/2], [25, 17.4, Math.PI], [35.5, 19, -Math.PI/2]]){
+      const cab = box(.5, 1.32, .6, mDrawer, x, .66, z); cab.rotation.y = ry; }
+    for(const [x, z, l] of [[13, 7, 1.1], [29, 10, .8], [9, 27, 1.3], [35, 28, .9]]){ const cb = new T.Mesh(new T.CylinderGeometry(.008, .008, l, 4), mDark); cb.position.set(x, WH - l/2, z); cb.rotation.z = .12; scene.add(cb); }
+    const mPanelOff = new T.MeshStandardMaterial({color:0x2a2c30, roughness:.4, emissive:0x000000}), mPanelOn = new T.MeshStandardMaterial({color:0xdfe8ff, emissive:0xbfd0ff, emissiveIntensity:.8});
+    const panels = [];
+    for(const [x, z, on] of [[17, 5, 0], [25, 5, 1], [33, 5, 0], [17, 13, 0], [29, 13, 0], [9, 27, 1], [21, 27, 0], [31, 27, 0], [5, 3, 0]]){
+      const pn = box(1.2, .05, .32, on ? mPanelOn.clone() : mPanelOff, x, WH - .03, z, scene, false); if(on){ const l = pl(0xbfd0ff, .55, 7, x, WH - .3, z); l.panel = pn; LIGHTS.push(l); panels.push(l); } }
+    const dustG = new T.BufferGeometry(), dustN = 260, dustP = new Float32Array(dustN*3);
+    for(let i=0;i<dustN;i++){ dustP[i*3] = (Math.random() - .5)*2.4; dustP[i*3+1] = (Math.random() - .5)*1.6; dustP[i*3+2] = -.6 - Math.random()*5; }
+    dustG.setAttribute("position", new T.BufferAttribute(dustP, 3));
+    const dust = new T.Points(dustG, new T.PointsMaterial({color:0xd8d0c0, size:.005, transparent:true, opacity:.3, depthWrite:false})); camera.add(dust);
+
     /* ---------- Marisol ---------- */
-    const mar = new T.Group(); if(marisolAt){ mar.position.set(marisolAt.x, 0, marisolAt.z); mar.rotation.y = 0; scene.add(mar);
+    const mar = new T.Group(), MR = {}; if(marisolAt){ mar.position.set(marisolAt.x, 0, marisolAt.z); mar.rotation.y = 0; scene.add(mar);
+      const mPhone = new T.MeshStandardMaterial({color:0xd6cfbe, roughness:.35});
       box(1.5, .06, .8, mDesk, 0, .76, -.45, mar); for(const lx of [-.7, .7]) box(.05, .74, .7, mMetal, lx, .37, -.45, mar);
-      box(.2, .07, .16, new T.MeshStandardMaterial({color:0xddd6c6, roughness:.4}), -.45, .82, -.5, mar);                          // the desk phone
-      box(.5, .06, .5, mMetal, 0, .46, .2, mar); box(.5, .55, .06, mMetal, 0, .76, .44, mar);
-      const cardigan = new T.MeshStandardMaterial({color:0x3a3744, roughness:.9});
-      const torso = new T.Mesh(new T.CylinderGeometry(.17, .22, .62, 10), cardigan); torso.position.set(0, .82, .22); torso.rotation.x = .35; torso.castShadow = true; mar.add(torso);
-      for(const s of [-1, 1]){ const th = new T.Mesh(new T.CylinderGeometry(.08, .07, .45, 8), cardigan); th.rotation.x = Math.PI/2; th.position.set(s*.1, .52, .02); mar.add(th);
-        const sh = new T.Mesh(new T.CylinderGeometry(.06, .05, .45, 8), mDark); sh.position.set(s*.1, .25, -.2); mar.add(sh); }
-      const head = new T.Mesh(new T.SphereGeometry(.13, 16, 12), mSkin); head.scale.set(1, 1.2, 1); head.position.set(0, 1.18, .05); head.rotation.x = .6; mar.add(head);
-      const hair = new T.Mesh(new T.SphereGeometry(.15, 12, 10, 0, Math.PI*2, 0, Math.PI*.75), mDark); hair.position.set(0, 1.2, .07); hair.rotation.x = .9; mar.add(hair);
-      const veil = box(.26, .38, .04, mDark, 0, 1.02, -.07, mar); veil.rotation.x = .3;                                                         // hair hanging over the face
-      const ua = new T.Mesh(new T.CylinderGeometry(.05, .045, .34, 8), cardigan); ua.position.set(.2, 1.02, .2); ua.rotation.set(-.3, 0, .4); mar.add(ua);
-      const fa = new T.Mesh(new T.CylinderGeometry(.045, .04, .3, 8), mSkin); fa.position.set(.2, 1.2, .02); fa.rotation.set(-1.2, 0, -.2); mar.add(fa);
-      const rec = box(.06, .06, .24, new T.MeshStandardMaterial({color:0xe2dccb, roughness:.4}), .16, 1.25, -.05, mar); rec.rotation.x = -.3;     // the receiver, grown into her hand
-      const seam = new T.Mesh(new T.SphereGeometry(.06, 10, 8), mGore); seam.position.set(.17, 1.23, -.02); seam.scale.set(1, .7, 1.4); mar.add(seam);
-      for(let i=0;i<6;i++){ const d = new T.Mesh(new T.CylinderGeometry(.006, .006, .15 + i*.04, 4), mGore); d.position.set(.2 + (i%3)*.02, 1.05 - i*.04, .02 + i*.02); mar.add(d); }
-      const cord = new T.Mesh(new T.TorusGeometry(.3, .006, 4, 24, Math.PI), new T.MeshStandardMaterial({color:0xddd6c6})); cord.position.set(-.15, 1.0, -.3); cord.rotation.set(.4, .5, 1.6); mar.add(cord);
-      const card = box(.08, .05, .005, new T.MeshStandardMaterial({color:0xe6e2d6, emissive:0x112233}), .22, 1.08, .06, mar); mar.card = card;
+      box(.2, .07, .16, mPhone, -.45, .82, -.5, mar); box(.3, .05, .38, mPaper, .35, .81, -.55, mar);
+      box(.5, .06, .5, mMetal, 0, .46, .2, mar); box(.5, .62, .06, mMetal, 0, .8, .46, mar);
+      const cardigan = new T.MeshStandardMaterial({color:0x34313c, roughness:.95});
+      const torso = new T.Mesh(new T.CylinderGeometry(.16, .21, .6, 12), cardigan); torso.position.set(0, .8, .2); torso.rotation.x = -.22; torso.castShadow = true; mar.add(torso);
+      for(const s of [-1, 1]){ const th = new T.Mesh(new T.CylinderGeometry(.075, .065, .45, 8), cardigan); th.rotation.x = Math.PI/2; th.position.set(s*.1, .52, .02); mar.add(th);
+        const sh = new T.Mesh(new T.CylinderGeometry(.055, .045, .45, 8), mDark); sh.position.set(s*.1, .25, -.2); mar.add(sh); }
+      // left arm limp on the desk
+      const la = new T.Mesh(new T.CylinderGeometry(.045, .04, .4, 8), cardigan); la.position.set(-.2, .92, -.08); la.rotation.set(-1.2, 0, -.2); mar.add(la);
+      // head, bowed, hair hanging in front of it
+      MR.head = new T.Group(); MR.head.position.set(0, 1.1, .12); MR.head.rotation.x = -.75; mar.add(MR.head);
+      const skullM = new T.Mesh(new T.SphereGeometry(.115, 16, 12), mSkin); skullM.scale.set(1, 1.22, 1); skullM.position.y = .13; MR.head.add(skullM);
+      const fp = new T.Mesh(new T.PlaneGeometry(.22, .28), new T.MeshStandardMaterial({map:tex(F1ART.marisolFace), transparent:true, alphaTest:.05, roughness:.6})); fp.position.set(0, .13, -.112); fp.rotation.y = Math.PI; MR.head.add(fp);
+      const mHair = new T.MeshStandardMaterial({color:0x0b0908, roughness:.8, side:T.DoubleSide}); MR.hair = [];
+      for(let i=0;i<16;i++){ const a = -1.4 + i/15*2.8, hp = new T.Mesh(new T.PlaneGeometry(.06, .46), mHair); const g = new T.Group(); g.position.set(Math.sin(a)*.1, .25, -Math.cos(a)*.09); g.rotation.y = -a; g.front = Math.abs(a) < .95; MR.head.add(g);
+        hp.position.y = -.2; hp.rotation.x = .05; g.add(hp); g.rotation.x = -.15; MR.hair.push(g); }
+      const crown = new T.Mesh(new T.SphereGeometry(.125, 12, 10, 0, Math.PI*2, 0, Math.PI*.55), mHair); crown.position.y = .15; MR.head.add(crown);
+      // the right arm, up to her ear, and the hand that will not let go
+      const ua = new T.Mesh(new T.CylinderGeometry(.048, .042, .34, 8), cardigan); ua.position.set(.2, 1.02, .18); ua.rotation.set(-.3, 0, .4); mar.add(ua);
+      const fa = new T.Mesh(new T.CylinderGeometry(.04, .036, .28, 8), mSkin); fa.position.set(.22, 1.12, .04); fa.rotation.set(-1.0, 0, -.25); mar.add(fa);
+      const joint = (x, y, z, r, m) => { const j = new T.Mesh(new T.SphereGeometry(r, 12, 10), m); j.position.set(x, y, z); j.castShadow = true; mar.add(j); return j; };
+      joint(.2 + .07, 1.02 - .15, .18 + .05, .05, cardigan); joint(.17, 1.17, .3, .05, cardigan);                         // shoulder, elbow
+      joint(-.2, .92 + .18, -.08 + .07, .046, cardigan); joint(-.23, .74, -.23, .04, mSkin);                              // the other arm
+      joint(.215, 1.17, .02, .038, mSkin);                                                                             // wrist
+      const rec = box(.05, .045, .22, mPhone, .15, 1.28, -.02, mar); rec.rotation.x = -.35;
+      const palmM = new T.Mesh(new T.SphereGeometry(.042, 20, 16), mSkin); palmM.scale.set(.9, 1.2, .8); palmM.position.set(.19, 1.25, .0); mar.add(palmM);
+      MR.fingers = [];
+      for(let i=0;i<4;i++){ const f = new T.Mesh(new T.CylinderGeometry(.011, .0095, .085, 12), mSkin); f.rotation.z = Math.PI/2; f.position.set(.15, 1.3 - i*.022, -.045 + i*.004); mar.add(f); MR.fingers.push(f); joint(.193, 1.3 - i*.022, -.045 + i*.004, .012, mSkin);
+        const n = new T.Mesh(new T.SphereGeometry(.008, 6, 5), mGore); n.position.set(.11, 1.3 - i*.022, -.045 + i*.004); mar.add(n); }       // the nails are gone
+      const seam = new T.Mesh(new T.TorusGeometry(.045, .012, 6, 16), mGore); seam.position.set(.155, 1.26, -.03); seam.rotation.y = Math.PI/2; mar.add(seam);   // where skin has grown over plastic
+      for(let i=0;i<5;i++){ const d = new T.Mesh(new T.CylinderGeometry(.005, .004, .12 + i*.05, 4), mGore); d.position.set(.19 + (i%3)*.015, 1.12 - i*.03, .02 + i*.012); mar.add(d); }
+      // the lanyard has grown into her wrist. the card hangs from it.
+      MR.wrist = new T.Vector3(.215, 1.17, .02); MR.cardRest = new T.Vector3(.23, 1.0, -.035);
+      MR.lanyard = new T.Mesh(new T.CylinderGeometry(.005, .005, .17, 4), new T.MeshStandardMaterial({color:0x1b4a8a, roughness:.6})); MR.lanyard.position.set(.222, 1.085, -.008); mar.add(MR.lanyard);
+      MR.card = box(.085, .055, .006, new T.MeshStandardMaterial({color:0xe6e2d6, emissive:0x223344, emissiveIntensity:.6, roughness:.3}), MR.cardRest.x, MR.cardRest.y, MR.cardRest.z, mar, false);
+      MR.strip = new T.Mesh(new T.BoxGeometry(.03, .006, 1), new T.MeshStandardMaterial({color:0x7a0a12, roughness:.25, metalness:.1})); MR.strip.visible = false; mar.add(MR.strip);
+      MR.drops = Array.from({length:40}, () => { const d = new T.Mesh(new T.SphereGeometry(.007, 5, 4), mGore); d.visible = false; mar.add(d); d.v = new T.Vector3(); return d; });
       decal(mBlood, marisolAt.x, marisolAt.z + .2, 2.4); }
 
     /* ---------- the elevator ---------- */
@@ -2385,7 +2438,7 @@ function floorOne(){
 
     /* ---------- the creature: built from people ---------- */
     const CR = new T.Group(); scene.add(CR); CR.visible = false;
-    const mFlesh = new T.MeshStandardMaterial({color:0x8a7f74, roughness:.75}), mFleshD = new T.MeshStandardMaterial({color:0x5a4f46, roughness:.8});
+    const mFlesh = new T.MeshStandardMaterial({color:0x9a8f84, map:tex(F1ART.skin, 1, 3), roughness:.7}), mFleshD = new T.MeshStandardMaterial({color:0x5a4f46, roughness:.8});
     const limb = (len, r0, r1, m) => { const g = new T.Group(), mesh = new T.Mesh(new T.CylinderGeometry(r0, r1, len, 8), m); mesh.position.y = -len/2; mesh.castShadow = true; g.add(mesh); g.len = len; return g; };
     const hips = new T.Group(); hips.position.y = 1.35; CR.add(hips);
     const spine = new T.Group(); hips.add(spine); spine.rotation.x = .35;
@@ -2450,7 +2503,7 @@ function floorOne(){
       flash.color.set(dmg >= 4 ? 0xffc0a8 : dmg >= 2 ? 0xffe0c8 : 0xfff0d8); };
 
     /* ---------- player and story state ---------- */
-    const P = {x:start.x, z:start.z, yaw:0, pitch:0, bob:0, stamina:1, hidden:null, breath:1, holding:false, eye:1.62};
+    const P = {x:start.x, z:start.z, yaw:0, pitch:0, bob:0, stamina:1, hidden:null, breath:1, holding:false, eye:1.62, vx:0, vz:0, sway:0, cy:1.62, cx:null, cz:null};
     for(const [dx, dz, yaw] of [[1,0,-Math.PI/2],[0,1,Math.PI],[-1,0,Math.PI/2],[0,-1,0]]) if(!solid(P.x + dx*CELL, P.z + dz*CELL)){ P.yaw = yaw; break; }
     const WAY = [[10,3],[19,3],[19,7],[9,7],[11,10],[9,13],[19,13],[15,10],[19,10],[8,5]].map(([x,y]) => [x*CELL+1, y*CELL+1]);
     const C = {x:39, z:27, mode:"hidden", path:[], pt:0, tgt:null, wi:0, step:0, lastX:0, lastZ:0, searchT:0, grace:0, yaw:0};
@@ -2547,60 +2600,51 @@ function floorOne(){
         scripted.elevCalled = t; panel.material.color.set(0x2aff6a); AU.tone(880, "sine", .01, .1, .3); say("The elevator is coming up from the basement. It's slow.", 4, "n"); setObj("Survive until the elevator arrives."); }
     }
 
-    /* ---------- Marisol: the close-up ---------- */
+    /* ---------- Marisol: taking the card, in the world ---------- */
+    let CS = null; const dummy = new T.PerspectiveCamera();
     async function takeCard(){
-      paused = true; AU.duck(.5); AU.breath(true); await closeup(); AU.breath(false); paused = false; if(!live()) return;
-      hasCard = true; if(mar.card) mar.card.visible = false; checkpoint = {x:P.x, z:P.z, yaw:P.yaw}; AU.scream(); AU.whisper("thank you for holding");
+      paused = true; AU.duck(.5); AU.breath(true);
+      CS = {phase:"in", k:0, p:0, hold:false, from:{pos:camera.position.clone(), q:camera.quaternion.clone()}};
+      const down = e => { if(CS) CS.hold = true; }, up = () => { if(CS) CS.hold = false; };
+      const kk = e => { if(e.key === " " && CS){ e.preventDefault(); CS.hold = e.type === "keydown"; } };
+      addEventListener("pointerdown", down); addEventListener("pointerup", up); addEventListener("touchstart", down, {passive:true}); addEventListener("touchend", up); addEventListener("keydown", kk); addEventListener("keyup", kk);
+      await new Promise(r => CS.done = r);
+      removeEventListener("pointerdown", down); removeEventListener("pointerup", up); removeEventListener("touchstart", down); removeEventListener("touchend", up); removeEventListener("keydown", kk); removeEventListener("keyup", kk);
+      CS = null; lookDX = lookDY = 0; renderer.toneMappingExposure = .9; AU.breath(false); paused = false; if(!live()) return;
+      hasCard = true; checkpoint = {x:P.x, z:P.z, yaw:P.yaw}; AU.whisper("thank you for holding");
       say("She whispered something. Then the phone in her hand started ringing.", 5, "n");
       const ring = setInterval(() => { if(!live() || done) return clearInterval(ring); const d = Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z); if(d < 14) AU.tone(1180, "square", .005, .05/(1 + d*.2), .25); }, 900);
       setTimeout(() => { if(!live()) return; AU.stinger(); say("it heard that. it's coming to look. get to the elevator: end of the bottom corridor, on the right. — s.", 7);
         setObj("Get to the elevator: end of the bottom corridor, on the right."); C.mode = "investigate"; C.tgt = [Math.floor(marisolAt.x/CELL), Math.floor(marisolAt.z/CELL)]; C.grace = 1.5; C.x = 25; C.z = 27; C.path = []; }, 2200);
     }
-    function closeup(){
-      return new Promise(res => {
-        const ov = document.createElement("canvas"); ov.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;z-index:9995;background:#000;touch-action:none";
-        const D = Math.min(2, devicePixelRatio || 1); ov.width = innerWidth*D; ov.height = innerHeight*D; document.body.appendChild(ov);
-        const c = ov.getContext("2d"); c.setTransform(D,0,0,D,0,0); const w = innerWidth, h = innerHeight;
-        const hint = document.createElement("div"); hint.style.cssText = "position:fixed;left:0;right:0;bottom:calc(40px + env(safe-area-inset-bottom,0px));text-align:center;z-index:9996;font:600 15px var(--mono);color:#ffd2d8;letter-spacing:.1em;pointer-events:none";
-        hint.textContent = touch ? "PRESS AND HOLD ANYWHERE TO PULL THE CARD FREE" : "HOLD THE MOUSE BUTTON (OR SPACE) TO PULL THE CARD FREE"; document.body.appendChild(hint);
-        let p = 0, holding = false, last = performance.now(), drips2 = [];
-        const on = e => { e.preventDefault(); holding = true; }, offH = () => { holding = false; };
-        ov.addEventListener("mousedown", on); addEventListener("mouseup", offH); ov.addEventListener("touchstart", on, {passive:false}); ov.addEventListener("touchend", offH);
-        const kk = e => { if(e.key === " "){ e.preventDefault(); holding = e.type === "keydown"; } }; addEventListener("keydown", kk); addEventListener("keyup", kk);
-        const frame = now => {
-          const dt = Math.min(.3, (now - last)/1000); last = now;
-          if(holding){ p = Math.min(1, p + dt/2.6); if(Math.random() < dt*8) crack(1, 0); if(Math.random() < dt*3) AU.wet(); } else p = Math.max(0, p - dt*.25);
-          const sx = (Math.random()-.5)*p*6, cx = w*.5 + sx, cy = h*.5, S = Math.min(w, h);
-          c.fillStyle = "#000"; c.fillRect(0, 0, w, h);
-          c.fillStyle = "#1a1310"; c.fillRect(0, cy + S*.22, w, h); c.fillStyle = "#3a0306"; c.beginPath(); c.ellipse(cx, cy + S*.3, S*.55, S*.1, 0, 0, 7); c.fill();
-          c.fillStyle = "#d8d2c2"; c.fillRect(cx - S*.42, cy - S*.08, S*.84, S*.16); c.fillStyle = "#b8b2a2"; c.fillRect(cx - S*.42, cy + S*.04, S*.84, S*.04);
-          c.fillStyle = "#b3a090"; c.beginPath(); c.ellipse(cx + S*.02, cy, S*.2, S*.15, -.1, 0, 7); c.fill();
-          for(let i=0;i<4;i++){ c.beginPath(); c.ellipse(cx - S*.1 + i*S*.075, cy - S*.12, S*.035, S*.07, .1, 0, 7); c.fill(); }
-          c.strokeStyle = "#5a0408"; c.lineWidth = S*.012; c.lineCap = "round";
-          for(let i=0;i<5;i++){ const x0 = cx - S*.2 + i*S*.09; c.beginPath(); c.moveTo(x0, cy - S*.04); c.quadraticCurveTo(x0 + S*.02, cy + S*.02, x0 - S*.01, cy + S*.07); c.stroke(); }
-          c.fillStyle = "#6e050b"; c.beginPath(); c.ellipse(cx + S*.02, cy + S*.08, S*.22, S*.03, 0, 0, 7); c.fill();
-          c.fillStyle = "rgba(200,180,160,.5)"; for(let i=0;i<20;i++) c.fillRect(cx - S*.2 + i*S*.021, cy + S*.07, S*.006, S*.02);
-          const pull = p*S*.35; c.fillStyle = "#a89484"; c.fillRect(cx + S*.15, cy - S*.06, S*.35, S*.12);
-          c.strokeStyle = "#1b4a8a"; c.lineWidth = S*.012; c.beginPath(); c.moveTo(cx + S*.3, cy - S*.06); c.quadraticCurveTo(cx + S*.36, cy + S*.2 + pull*.4, cx + S*.28 + pull*.3, cy + S*.28 + pull); c.stroke();
-          const kx = cx + S*.2 + pull*.3, ky = cy + S*.26 + pull;
-          if(p > .25){ c.fillStyle = "#8a0a10"; c.beginPath(); c.moveTo(cx + S*.24, cy + S*.05); c.lineTo(kx + S*.02, ky); c.lineTo(kx + S*.12, ky); c.lineTo(cx + S*.34, cy + S*.05); c.fill();
-            c.strokeStyle = "rgba(210,180,170,.6)"; c.lineWidth = 1; for(let i=0;i<6;i++){ c.beginPath(); c.moveTo(cx + S*.26 + i*S*.014, cy + S*.05); c.lineTo(kx + S*.03 + i*S*.015, ky); c.stroke(); } }
-          c.fillStyle = "#e6e2d6"; c.fillRect(kx, ky, S*.16, S*.1); c.fillStyle = "#39d6ff"; c.fillRect(kx + S*.01, ky + S*.012, S*.04, S*.025);
-          c.fillStyle = "#222"; c.font = `${Math.round(S*.018)}px ui-monospace,monospace`; c.fillText("NIMBUS · M. REYES", kx + S*.01, ky + S*.07);
-          if(p > .2 && Math.random() < p*.6) drips2.push({x: cx + S*(.2 + Math.random()*.15), y: cy + S*.06, v: S*(.1 + Math.random()*.2)});
-          drips2 = drips2.filter(d => (d.y += d.v*dt) < h); c.fillStyle = "#6a0509"; drips2.forEach(d => c.fillRect(d.x, d.y, 2, 7));
-          c.save(); c.filter = "blur(2px) brightness(.62) contrast(1.25) saturate(.8)"; c.drawImage(ov, 0, 0, ov.width, ov.height, 0, 0, w, h); c.restore();
-          c.fillStyle = "rgba(0,0,0,.18)"; for(let y=0;y<h;y+=3) c.fillRect(0, y, w, 1);
-          const vg = c.createRadialGradient(cx, cy, S*.2, cx, cy, Math.max(w,h)*.7); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.92)"); c.fillStyle = vg; c.fillRect(0, 0, w, h);
-          c.fillStyle = "#300"; c.fillRect(w*.3, h - 18, w*.4, 6); c.fillStyle = "#ff2d55"; c.fillRect(w*.3, h - 18, w*.4*p, 6);
-          if(p >= 1){ hint.remove(); AU.hit(); AU.wet(); c.fillStyle = "#000"; c.fillRect(0, 0, w, h);
-            setTimeout(() => { c.fillStyle = "#000"; c.fillRect(0, 0, w, h); c.drawImage(F1ART.marisolFace, w/2 - Math.min(w,h)*.35, h*.08, Math.min(w,h)*.7, Math.min(w,h)*.875);
-              setTimeout(() => { removeEventListener("mouseup", offH); removeEventListener("keydown", kk); removeEventListener("keyup", kk); ov.remove(); res(true); }, 650); }, 300);
-            return; }
-          if(live()) requestAnimationFrame(frame); else { ov.remove(); hint.remove(); }
-        };
-        requestAnimationFrame(frame);
-      });
+    const L2W = v => mar.localToWorld(v.clone());
+    function cardScene(dt){
+      const camT = L2W(new T.Vector3(.38, 1.24, -.5)), lookHand = L2W(new T.Vector3(.19, 1.15, -.02)), lookFace = L2W(new T.Vector3(0, 1.24, -.05));
+      dummy.position.copy(camT); dummy.lookAt(CS.phase === "snap" || CS.phase === "out" ? lookFace : lookHand);
+      const ease = k => k < .5 ? 2*k*k : 1 - Math.pow(-2*k + 2, 2)/2;
+      renderer.toneMappingExposure = CS.phase === "out" ? .9 : .72;
+      if(CS.phase === "in"){ CS.k = Math.min(1, CS.k + dt/.8); const e = ease(CS.k); camera.position.lerpVectors(CS.from.pos, camT, e); camera.quaternion.copy(CS.from.q).slerp(dummy.quaternion, e); if(CS.k >= 1){ CS.phase = "pull"; say("The card is on a lanyard. The lanyard has grown into her wrist.", 4, "n"); } return; }
+      if(CS.phase === "pull"){
+        CS.p = CS.hold ? Math.min(1, CS.p + dt/2.8) : Math.max(0, CS.p - dt*.15);
+        const p = CS.p, sh = p*.006; camera.position.copy(camT).add(new T.Vector3((Math.random() - .5)*sh, (Math.random() - .5)*sh, 0)); camera.quaternion.copy(dummy.quaternion);
+        const cardPos = MR.cardRest.clone().add(new T.Vector3(-.02*p, -.03*p, -.3*p)); MR.card.position.copy(cardPos); MR.card.rotation.set(-.4*p, .3*p, .2*p);
+        MR.lanyard.visible = p < .05; MR.strip.visible = p >= .05;
+        if(p >= .05){ const a = MR.wrist, len = a.distanceTo(cardPos); MR.strip.position.copy(a).add(cardPos).multiplyScalar(.5); MR.strip.scale.set(1 + p*.6, 1, len); MR.strip.lookAt(L2W(cardPos)); }
+        MR.fingers.forEach((f, i) => f.rotation.x = CS.hold ? (Math.random() - .5)*p*.5 : 0);
+        if(CS.hold){ if(Math.random() < dt*10*p) crack(.4, 0); if(Math.random() < dt*3) AU.wet(); }
+        if(CS.hold && Math.random() < dt*30*p){ const d = MR.drops.find(x => !x.visible); if(d){ d.visible = true; d.position.copy(MR.wrist).add(new T.Vector3(0, -.02, -.02)); d.v.set((Math.random() - .5)*.3, -.2 - Math.random()*.3, -(Math.random())*.4); } }
+        if(p >= 1){ CS.phase = "snap"; CS.k = 0; MR.card.visible = false; MR.strip.visible = false; AU.hit(); AU.wet(); AU.scream();
+          for(const d of MR.drops){ d.visible = true; d.position.copy(MR.wrist); d.v.set((Math.random() - .5)*1.2, Math.random()*.8, -Math.random()*1.2); } }
+      }
+      if(CS.phase === "snap"){ CS.k += dt; const e = Math.min(1, CS.k/.12);
+        MR.head.rotation.x = -.75 + (.18 + .75)*e; MR.hair.forEach(g => { if(g.front) g.visible = e < .5; else g.rotation.x = -.15 + e*.35; });
+        const sh = Math.max(0, .02 - CS.k*.015); camera.position.copy(camT).add(new T.Vector3((Math.random() - .5)*sh, (Math.random() - .5)*sh, 0));
+        camera.quaternion.slerp(dummy.quaternion, Math.min(1, dt*14));
+        if(CS.k > 1.4){ CS.phase = "out"; CS.k = 0; CS.from = {pos:camera.position.clone(), q:camera.quaternion.clone()}; } }
+      if(CS.phase === "out"){ CS.k = Math.min(1, CS.k + dt/.7); const e = ease(CS.k);
+        dummy.position.set(P.x, 1.62, P.z); dummy.rotation.set(P.pitch, P.yaw, 0, "YXZ");
+        camera.position.lerpVectors(CS.from.pos, dummy.position, e); camera.quaternion.copy(CS.from.q).slerp(dummy.quaternion, e); if(CS.k >= 1) CS.done(); }
+      for(const d of MR.drops){ if(!d.visible) continue; d.v.y -= 9.8*dt; d.position.addScaledVector(d.v, dt); if(d.position.y < .02){ d.position.y = .015; d.v.set(0, 0, 0); } }
     }
 
     /* ---------- getting caught ---------- */
@@ -2628,7 +2672,7 @@ function floorOne(){
       c.fillStyle = "#000"; c.fillRect(0, 0, w, h); await new Promise(r => setTimeout(r, 500)); ov.remove();
       await taking("it caught you on floor 9.");
       if(!live()) return;
-      P.x = checkpoint.x; P.z = checkpoint.z; P.yaw = checkpoint.yaw; P.pitch = 0; P.hidden = null; fl = true; if(btnLight) btnLight.classList.add("on");
+      P.x = checkpoint.x; P.z = checkpoint.z; P.yaw = checkpoint.yaw; P.pitch = 0; P.hidden = null; P.vx = P.vz = 0; P.cx = null; fl = true; if(btnLight) btnLight.classList.add("on");
       const far = WAY.slice().sort((a,b) => Math.hypot(b[0]-P.x, b[1]-P.z) - Math.hypot(a[0]-P.x, a[1]-P.z))[0];
       C.x = far[0]; C.z = far[1]; C.mode = hasCard ? "investigate" : "patrol"; C.tgt = hasCard ? [Math.floor(P.x/CELL), Math.floor(P.z/CELL)] : null; C.grace = 6; C.path = [];
       if(scripted.elevCalled && !scripted.elevOpen){ scripted.elevCalled = 0; scripted.elevSent = false; panel.material.color.set(0xff2a1a); drawInd("B2"); setObj("Get to the elevator and call it again."); }
@@ -2670,23 +2714,28 @@ function floorOne(){
       if(!live()){ cleanup(); return; }
       const dt = Math.min(.05, (now - last)/1000); last = now;
       if(!paused && !caught && !done) update(dt);
+      else if(CS){ t += dt; subT -= dt; if(subT <= 0) sub = null; btnAct.style.display = "none"; cardScene(dt); }
       draw(dt, now/1000);
       requestAnimationFrame(frame);
     }
     function update(dt){
       t += dt; subT -= dt; if(subT <= 0) sub = null;
-      P.yaw -= lookDX*.0032; P.pitch = Math.max(-1.35, Math.min(1.35, P.pitch - lookDY*.0032)); lookDX = lookDY = 0;
-      if(K.arrowleft) P.yaw += 2*dt; if(K.arrowright) P.yaw -= 2*dt;
+      if(P._y !== P.yaw) P.tyaw = P.yaw; if(P._p !== P.pitch) P.tpitch = P.pitch;                 // smoothed look: the view eases toward where you point it
+      P.tyaw -= lookDX*.0032; P.tpitch = Math.max(-1.35, Math.min(1.35, P.tpitch - lookDY*.0032)); P.sway += (Math.max(-.04, Math.min(.04, -lookDX*.0007)) - P.sway)*Math.min(1, dt*8); lookDX = lookDY = 0;
+      if(K.arrowleft) P.tyaw += 2*dt; if(K.arrowright) P.tyaw -= 2*dt;
+      P.yaw += (P.tyaw - P.yaw)*Math.min(1, dt*20); P.pitch += (P.tpitch - P.pitch)*Math.min(1, dt*20); P._y = P.yaw; P._p = P.pitch;
       let fwd = (K.w || K.arrowup ? 1 : 0) - (K.s || K.arrowdown ? 1 : 0) - stick.y, str = (K.d ? 1 : 0) - (K.a ? 1 : 0) + stick.x;
       if(Math.abs(fwd) < .15) fwd = 0; if(Math.abs(str) < .15) str = 0;
       const moving = !P.hidden && (fwd || str), running = moving && K.shift && P.stamina > 0;
       P.stamina = Math.max(0, Math.min(1, P.stamina + (running ? -dt/4 : dt/6)));
-      if(moving){ const sp = (running ? 5.6 : 3.2)*dt, fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
-        let mx = (fx*fwd + rx*str), mz = (fz*fwd + rz*str); const m = Math.hypot(mx, mz); if(m > 1){ mx /= m; mz /= m; }
-        const r = .35, vx = mx*sp, vz = mz*sp;
+      let tvx = 0, tvz = 0;
+      if(moving){ const spd = running ? 5.6 : 3.2, fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
+        let mx = (fx*fwd + rx*str), mz = (fz*fwd + rz*str); const m = Math.hypot(mx, mz); if(m > 1){ mx /= m; mz /= m; } tvx = mx*spd; tvz = mz*spd; }
+      P.vx += (tvx - P.vx)*Math.min(1, dt*9); P.vz += (tvz - P.vz)*Math.min(1, dt*9);                 // you speed up and slow down instead of snapping
+      if(Math.hypot(P.vx, P.vz) > .05 && !P.hidden){ const r = .35, vx = P.vx*dt, vz = P.vz*dt;
         if(!solid(P.x + vx + Math.sign(vx)*r, P.z) && !solid(P.x + vx + Math.sign(vx)*r, P.z + r*.7) && !solid(P.x + vx + Math.sign(vx)*r, P.z - r*.7)) P.x += vx;
         if(!solid(P.x, P.z + vz + Math.sign(vz)*r) && !solid(P.x + r*.7, P.z + vz + Math.sign(vz)*r) && !solid(P.x - r*.7, P.z + vz + Math.sign(vz)*r)) P.z += vz;
-        P.bob += dt*(running ? 12 : 8); stepT -= dt; if(stepT <= 0){ stepT = running ? .3 : .5; AU.noiseAt(AU.ctx ? AU.ctx.currentTime : 0, .07, "lowpass", 360, running ? .14 : .05, .002, .06); } }
+        const spdNow = Math.hypot(P.vx, P.vz); P.bob += dt*spdNow*2.5; stepT -= dt*spdNow/3.2; if(stepT <= 0){ stepT = running ? .3 : .5; AU.noiseAt(AU.ctx ? AU.ctx.currentTime : 0, .07, "lowpass", 360, running ? .14 : .05, .002, .06); } }
       flickT -= dt; if(flickT <= 0){ flickT = .04 + Math.random()*.25; flick = Math.random() < .04 + TAKEN.letters.length*.04 ? .2 + Math.random()*.5 : 1; }
       creature(dt);
       /* scripted moments */
@@ -2720,9 +2769,13 @@ function floorOne(){
       const label = context(); btnAct.style.display = label ? "block" : "none"; btnAct.textContent = label || "";
     }
     function draw(dt, time){
-      const eyeH = P.hidden ? .55 : 1.62 + (P.hidden ? 0 : Math.sin(P.bob)*.03);
-      camera.position.set(P.x, eyeH, P.z); camera.rotation.set(P.hidden ? Math.max(-.5, Math.min(.35, P.pitch)) : P.pitch, P.yaw, 0);
-      hand.position.set(.26 + Math.cos(P.bob*.5)*.01, -.3 + Math.abs(Math.sin(P.bob*.5))*.012 - (P.hidden ? .1 : 0), -.5);
+      const eyeH = P.hidden ? .55 : 1.62 + Math.sin(P.bob)*.025;
+      if(P.cx === null || Math.hypot(P.cx - P.x, P.cz - P.z) > 3){ P.cx = P.x; P.cz = P.z; }
+      const k = Math.min(1, dt*10); P.cx += (P.x - P.cx)*k; P.cz += (P.z - P.cz)*k; P.cy += (eyeH - P.cy)*Math.min(1, dt*(P.hidden ? 5 : 12));   // crouching under a desk is a movement, not a cut
+      if(!CS){ camera.position.set(P.cx, P.cy, P.cz); camera.rotation.set(P.hidden ? Math.max(-.5, Math.min(.35, P.pitch)) : P.pitch, P.yaw, 0, "YXZ"); }
+      hand.visible = !CS || CS.phase === "in" || CS.phase === "out";
+      hand.position.set(.26 + Math.cos(P.bob*.5)*.012 + P.sway, -.3 + Math.abs(Math.sin(P.bob*.5))*.014 - (P.hidden ? .1 : 0), -.5); hand.rotation.z = P.sway*2;
+      dust.visible = fl && !P.hidden; { const pa = dust.geometry.attributes.position; for(let i=0;i<dustN;i++){ pa.array[i*3+1] += Math.sin(time*.3 + i)*.0006 - .0002; if(pa.array[i*3+1] < -.8) pa.array[i*3+1] = .8; } pa.needsUpdate = true; }
       const on = fl && !P.hidden; flash.intensity = on ? 1.6*flick : 0; lens.material.color.set(on ? 0xfff2d0 : 0x222222);
       drips.forEach((dd, i) => { const k = ((time*.3 + i*.33) % 1); dd.scale.y = .02 + k*.2; dd.position.y = -.06 - k*.1; });
       updateHand();
@@ -2732,7 +2785,8 @@ function floorOne(){
       CR.updateMatrixWorld(true); face.lookAt(camera.getWorldPosition(tmp));   // its face always turns to you
       eyes.forEach(e => e.visible = C.mode !== "hidden" && (C.mode === "hunt" || d < 18));
       /* lights stutter when it is near them */
-      for(const L of LIGHTS){ const ld = Math.hypot(L.position.x - C.x, L.position.z - C.z); L.intensity = L.base*(ld < 6 && Math.random() < .3 ? Math.random()*.3 : (Math.sin(time*13 + L.position.x) > -.85 ? 1 : .3)); }
+      for(const L of LIGHTS){ const ld = Math.hypot(L.position.x - C.x, L.position.z - C.z); L.intensity = L.base*(ld < 6 && Math.random() < .3 ? Math.random()*.3 : (Math.sin(time*13 + L.position.x) > -.85 ? 1 : .3));
+        if(L.panel) L.panel.material.emissiveIntensity = .8*L.intensity/L.base; }
       for(const m of monitors){ if(m.screen){ const md2 = Math.hypot(m.x - C.x, m.z - C.z); m.screen.material.color.setScalar(md2 < 5 && Math.random() < .35 ? .05 : 1); } }
       renderer.render(scene, camera);
       drawHud(dt, d);
@@ -2754,6 +2808,9 @@ function floorOne(){
       if(P.stamina < .98){ c.fillStyle = "rgba(255,255,255,.12)"; c.fillRect(W/2 - 60, H - 14, 120, 4); c.fillStyle = "rgba(255,255,255,.55)"; c.fillRect(W/2 - 60, H - 14, 120*P.stamina, 4); }
       if(P.hidden){ c.fillStyle = "rgba(255,45,85,.25)"; c.fillRect(W/2 - 100, H - 130, 200, 6); c.fillStyle = "#ff2d55"; c.fillRect(W/2 - 100, H - 130, 200*P.breath, 6);
         c.textAlign = "center"; c.fillStyle = "#ffd2d8"; c.font = "600 12px ui-monospace,monospace"; c.fillText(touch ? "BREATH" : "BREATH — hold SPACE when it's close", W/2, H - 138); }
+      if(CS && CS.phase === "pull"){ c.textAlign = "center"; c.fillStyle = "#ffd2d8"; c.font = "600 15px ui-monospace,monospace";
+        c.fillText(touch ? "PRESS AND HOLD ANYWHERE TO PULL THE CARD" : "HOLD THE MOUSE BUTTON (OR SPACE) TO PULL THE CARD", W/2, H - 52);
+        c.fillStyle = "rgba(255,45,85,.25)"; c.fillRect(W*.3, H - 36, W*.4, 6); c.fillStyle = "#ff2d55"; c.fillRect(W*.3, H - 36, W*.4*CS.p, 6); }
       if(!touch && !document.pointerLockElement && t < 20){ c.textAlign = "center"; c.fillStyle = "rgba(233,226,216,.7)"; c.font = "12px ui-monospace,monospace"; c.fillText("click to look around with the mouse", W/2, H - 24); }
       if(sub){ c.textAlign = "center"; c.font = `${sub.who === "s" ? "500" : "italic 500"} ${W < 700 ? 14 : 17}px ${sub.who === "s" ? "ui-monospace,Menlo,monospace" : "Georgia,serif"}`;
         const words = sub.txt.split(" "), lines = []; let ln = ""; for(const w2 of words){ const tst = ln + w2 + " "; if(c.measureText(tst).width > W*.7 && ln){ lines.push(ln); ln = w2 + " "; } else ln = tst; } lines.push(ln);
@@ -2771,7 +2828,7 @@ function floorOne(){
       try{ document.exitPointerLock && document.exitPointerLock(); }catch(e){}
       ui.remove(); hud.remove(); renderer.dispose(); cv.remove(); AU.breath(false); AU.heartbeat(0); document.body.classList.remove("floor");
     }
-    DEV.f1 = { P, C, stick, action: () => action(), caught: () => getCaught(), get t(){ return t; }, get hasCard(){ return hasCard; }, get objective(){ return objective; }, renderer };   // test hook
+    DEV.f1 = { P, C, stick, action: () => action(), caught: () => getCaught(), get t(){ return t; }, get hasCard(){ return hasCard; }, get objective(){ return objective; }, get CS(){ return CS; }, renderer };   // test hook
     requestAnimationFrame(frame);
   });
 }
