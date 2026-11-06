@@ -423,11 +423,11 @@
 
 
   /* ---------- developer menu (username "dev", or add #dev to the URL) ---------- */
-  #devbar{ position:fixed; left:calc(10px + env(safe-area-inset-left,0px)); top:calc(10px + env(safe-area-inset-top,0px)); z-index:9999; display:none; gap:6px; flex-wrap:wrap;
+  #devbar{ position:fixed; left:calc(10px + env(safe-area-inset-left,0px)); bottom:calc(70px + env(safe-area-inset-bottom,0px)); z-index:9999; display:none; gap:6px; flex-wrap:wrap;
            font-family:var(--mono); font-size:11px; max-width:calc(100vw - 20px) }
   #devbar button{ font:inherit; background:#141a00; color:#e6ff4d; border:1px solid #8a9a10; padding:7px 10px; cursor:pointer; touch-action:manipulation }
   #devbar button.on{ background:#e6ff4d; color:#000 } #devbar button:disabled{ opacity:.35; cursor:default }
-  .devmenu{ max-width:980px; margin:0 auto; padding-top:64px !important; font-family:var(--mono); color:#d8e6d0; padding-bottom:60px }
+  .devmenu{ max-width:980px; margin:0 auto; padding-top:24px !important; font-family:var(--mono); color:#d8e6d0; padding-bottom:60px }
   .devmenu h1{ font-size:22px; color:#e6ff4d; letter-spacing:.06em } .devmenu h2{ font-size:14px; color:#e6ff4d; margin:28px 0 4px; letter-spacing:.08em }
   .devmenu p.lead{ font-size:12px; color:#8fa08a; line-height:1.7; margin-top:8px; max-width:70ch }
   .devgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; margin-top:10px }
@@ -1735,10 +1735,13 @@ async function theLongDark(){
    Each broken rule costs one letter of your name. Nothing else does.
    ================================================================ */
 const ACT2CSS = `
-html.devmode .objective, html.devmode #namebar{ top:calc(52px + env(safe-area-inset-top,0px)) !important }
-#namebar{ position:fixed; top:calc(10px + env(safe-area-inset-top,0px)); right:calc(12px + env(safe-area-inset-right,0px)); z-index:9990; display:none;
-  font-family:var(--mono); font-size:12px; background:rgba(0,0,0,.82); color:#cfc6c0; border:1px solid #3a1015; padding:7px 11px; letter-spacing:.06em; pointer-events:none }
-#namebar b{ color:#fff; font-weight:600; letter-spacing:.18em } #namebar b i{ color:#ff2d55; font-style:normal; text-decoration:underline }
+html.a2 body{ padding-top:calc(40px + env(safe-area-inset-top,0px)) }
+#namebar{ position:fixed; top:0; left:0; right:0; z-index:9990; display:none; align-items:center; gap:14px; justify-content:space-between;
+  padding:calc(8px + env(safe-area-inset-top,0px)) max(12px, env(safe-area-inset-right,0px)) 8px max(12px, env(safe-area-inset-left,0px));
+  font-family:var(--mono); font-size:12px; background:#050203; color:#cfc6c0; border-bottom:1px solid #3a1015; letter-spacing:.04em; min-height:40px }
+#namebar .g{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; color:#e9e2d8 } #namebar .g b{ color:#ff5e7a; font-weight:600 }
+#namebar .n{ flex:none; white-space:nowrap } #namebar .n b{ color:#fff; font-weight:600; letter-spacing:.18em } #namebar .n b i{ color:#ff2d55; font-style:normal; text-decoration:underline }
+@media (max-width:640px){ #namebar .n span{ display:none } }
 #rulesbtn{ position:fixed; left:calc(12px + env(safe-area-inset-left,0px)); bottom:calc(14px + env(safe-area-inset-bottom,0px)); z-index:9990; display:none;
   font-family:var(--mono); font-size:12px; background:#0d0607; color:#ffd2d8; border:1px solid #ff2d55; padding:10px 14px; cursor:pointer; letter-spacing:.08em; min-height:44px }
 #rulespanel{ position:fixed; inset:0; z-index:9993; display:none; background:rgba(0,0,0,.86); align-items:center; justify-content:center; padding:20px }
@@ -1781,7 +1784,7 @@ html.devmode .objective, html.devmode #namebar{ top:calc(52px + env(safe-area-in
 .sign97 button{ font-family:Verdana; font-weight:700; background:#0f0; color:#000; border:2px outset #8f8; padding:8px 14px; cursor:pointer }
 /* index of */
 body.apache{ background:#fff !important; color:#000; font-family:"Times New Roman",serif; filter:none !important; animation:none !important }
-.idx{ max-width:860px; margin:0 auto; padding:20px 0 90px } .idx h1{ font-size:28px; font-weight:700; margin-bottom:12px; word-break:break-all }
+.idx{ max-width:860px; margin:0 auto; padding:20px max(16px, env(safe-area-inset-right,0px)) 90px max(16px, env(safe-area-inset-left,0px)) } .idx h1{ font-size:28px; font-weight:700; margin-bottom:12px; word-break:break-all }
 .idx table{ width:100%; border-collapse:collapse; font-size:15px } .idx th{ text-align:left; padding:4px 8px; border-bottom:1px solid #000 } .idx td{ padding:6px 8px; vertical-align:top }
 .idx a{ color:#00e; text-decoration:underline; cursor:pointer } .idx tr.fut td{ color:#000 } .idx address{ font-style:italic; font-size:13px; margin-top:14px; border-top:1px solid #000; padding-top:6px }
 .idx .wrapT{ overflow-x:auto } .viewer{ position:fixed; inset:0; z-index:9984; background:rgba(0,0,0,.9); display:flex; align-items:center; justify-content:center; padding:20px }
@@ -1806,7 +1809,7 @@ body.phonebg{ background:#050507 !important; filter:none !important; animation:n
 .phone .flip{ position:absolute; left:16px; right:16px; bottom:22px; z-index:4; border:0; border-radius:14px; padding:14px; font:inherit; font-weight:600; background:#ff2d55; color:#fff; cursor:pointer; display:none }
 .phrase{ text-align:center; font-family:var(--mono); font-size:13px; color:#9aa; margin-top:14px; letter-spacing:.14em } .phrase b{ color:#7dffb0 }
 /* settings */
-.acct{ max-width:980px; margin:0 auto; display:grid; grid-template-columns:200px 1fr; gap:24px; padding-top:50px }
+.acct{ animation:none !important; max-width:980px; margin:0 auto; display:grid; grid-template-columns:200px 1fr; gap:24px; padding-top:30px }
 .acct nav{ display:flex; flex-direction:column; gap:4px } .acct nav button{ text-align:left; font:inherit; font-size:14px; background:none; border:0; color:var(--muted); padding:10px 12px; cursor:pointer; border-radius:8px }
 .acct nav button.on{ background:var(--card-hi); color:var(--text) }
 .acct section{ display:none } .acct section.on{ display:block } .acct .row2{ display:flex; gap:18px; align-items:center; flex-wrap:wrap; margin-top:16px }
@@ -1829,10 +1832,12 @@ const glitchStr = (s, amt) => [...s].map(ch => Math.random() < amt ? pick(["▓"
 const newLayer = () => { const id = ++LAYER.id; return () => LAYER.id === id; };
 
 const NAMEBAR = {
-  show(){ const e = document.getElementById("namebar"); e.style.display = "block"; this.update(); },
-  hide(){ document.getElementById("namebar").style.display = "none"; },
+  goal:"",
+  show(){ const e = document.getElementById("namebar"); e.style.display = "flex"; document.documentElement.classList.add("a2"); this.update(); },
+  hide(){ document.getElementById("namebar").style.display = "none"; document.documentElement.classList.remove("a2"); },
   update(){ const e = document.getElementById("namebar"); const n = fullName();
-    e.innerHTML = `signed in as <b>${[...n].map(ch => ch === "_" ? "<i>_</i>" : esc(ch)).join("")}</b>`; }
+    e.innerHTML = `<span class="g" title="tap to read the rules">${this.goal ? `<b>GOAL</b> ${esc(this.goal)}` : ""}</span><span class="n"><span>signed in as </span><b>${[...n].map(ch => ch === "_" ? "<i>_</i>" : esc(ch)).join("")}</b></span>`;
+    e.querySelector(".g").onclick = () => { if(document.getElementById("rulesbtn").style.display === "block") RULES.open(false); }; }
 };
 
 const RULES = {
@@ -1842,7 +1847,7 @@ const RULES = {
     NAMEBAR.show(); const b = document.getElementById("rulesbtn"); b.style.display = "block"; b.textContent = "📜 RULES"; b.onclick = () => this.open(false);
     this.objective(goal); await this.open(true);
   },
-  objective(txt){ if(!this.obj){ this.obj = document.createElement("div"); this.obj.className = "objective"; document.body.appendChild(this.obj); } this.obj.style.display = "block"; this.obj.textContent = "GOAL: " + txt; this.goal = txt; },
+  objective(txt){ this.goal = txt; NAMEBAR.goal = txt; NAMEBAR.update(); },
   open(first){
     return new Promise(res => { const p = document.getElementById("rulespanel"); p.style.display = "flex"; AU.click();
       p.innerHTML = `<div class="tos" role="dialog" aria-label="rules"><h3>NIMBUS · TERMS OF SERVICE</h3><h4>${esc(this.title)}</h4>
@@ -1859,7 +1864,7 @@ const RULES = {
     b.style.display = "block"; AU.duck(.5); AU.stinger(); await new Promise(r => setTimeout(r, 2600)); b.style.display = "none";
     await taking(why); NAMEBAR.update();
   },
-  hide(){ document.getElementById("rulesbtn").style.display = "none"; document.getElementById("rulespanel").style.display = "none"; if(this.obj) this.obj.style.display = "none"; }
+  hide(){ document.getElementById("rulesbtn").style.display = "none"; document.getElementById("rulespanel").style.display = "none"; NAMEBAR.goal = ""; NAMEBAR.update(); }
 };
 
 /* ================================================================
@@ -1874,7 +1879,7 @@ function act2Login(){
       <p>You were signed out. You were signed in somewhere else.</p>
       <p>There is one unread message. It is from someone called <b>syslog</b>.</p>
       <p style="margin-top:14px"><button class="btn" id="open" style="max-width:260px;background:#3a4a6b;color:#fff;animation:none">Read message</button></p></div></div>`);
-  document.getElementById("open").onclick = () => layerOne();
+  document.getElementById("open").onclick = e => { if(e.currentTarget.disabled) return; e.currentTarget.disabled = true; layerOne(); };
 }
 
 async function layerOne(){
@@ -1908,7 +1913,7 @@ async function layerOne(){
     ["Never open a thread with your own name in the title.", "Never reply to private messages from the moderator.", "If the page reloads by itself, scroll back to the very top before you tap anything else."]);
   if(!live()) return;
   const draw = () => {
-    render(`<div class="wrap" style="padding-top:56px">
+    render(`<div class="wrap">
       <div class="fhead"><div class="logo2">nimbus-support<small>UNOFFICIAL USER BOARD · EST. 2016</small></div><div class="userbox">signed in as <b>${esc(handle())}</b></div></div>
       <div class="modbar"><span>MODERATOR REVIEWING THIS BOARD</span><span class="m"><i id="modm"></i></span></div>
       ${reloadDone && mustTop ? `<div style="background:#b31414;color:#fff;padding:10px 12px;font-size:12px;max-width:960px;margin:0 auto 10px">⟳ This page was reloaded.</div>` : ""}
@@ -2019,7 +2024,7 @@ async function layerTwo(){
     if(name === "priya") body = `<h1>priya reads the terms</h1><p>i read the whole nimbus terms of service out loud. section 9 is the important one.</p>
       <p style="margin-top:12px;line-height:1.9;font-family:Georgia,serif;color:#cfc">9.1 the account holder agrees to be kept.<br>9.2 the account holder may be released only if deleted in full.<br>9.3 deletion requires the account holder's complete name.<br>9.4 ${word(3)}.</p>
       <p style="margin-top:14px">${stare(" <span style='font-size:11px;color:#f88'>&lt;-- listen to me read it</span>")}</p>`;
-    render(`<div class="wrap r97" style="padding-top:56px"><div class="rbar"></div><div class="retrobox">${ring()}${found()}${body}${ring()}</div><div class="rbar"></div></div>`);
+    render(`<div class="wrap r97"><div class="rbar"></div><div class="retrobox">${ring()}${found()}${body}${ring()}</div><div class="rbar"></div></div>`);
     document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { AU.click(); const g = b.dataset.go;
       at = g === "home" ? 0 : (at + (+g) + PAGES.length) % PAGES.length; page(PAGES[at]); });
     document.querySelectorAll("[data-w]").forEach(w => w.onclick = () => { const i = +w.dataset.w; if(got[i]) return; got[i] = true; AU.chord(); w.classList.add("got");
@@ -2082,7 +2087,7 @@ async function layerThree(){
     if(wrong){ list = list.slice().reverse(); list.splice(1, 0, {name:"it/", date:d("2026","11-06"), size:"-", kind:"dir"}); }
     if(path.startsWith("/doors/24/stairs/up/")) upDepth = (path.match(/up\//g) || []).length;
     skin("apache"); tab(`Index of ${path}`, "📁");
-    render(`<div class="wrap idx" style="padding-top:56px"><h1>Index of ${esc(path)}</h1>
+    render(`<div class="wrap idx"><h1>Index of ${esc(path)}</h1>
       ${upDepth >= 3 && path.includes("/up/") ? `<p style="color:#a00">you have been going up for a while. the stairs only went down when you came in.</p>` : ""}
       <div class="wrapT"><table><tr><th>Name</th><th>Last modified</th><th>Size</th></tr>
       ${path !== "/doors/" ? `<tr><td><a data-p="1">⬑ Parent Directory</a></td><td></td><td>-</td></tr>` : ""}
@@ -2127,7 +2132,7 @@ async function layerFour(){
   if(!live()) return;
   skin("phonebg"); tab("", "📱");
   const now = new Date(); let hh = now.getHours() % 12 || 12, mm = now.getMinutes(), forced = null;
-  render(`<div class="wrap" style="padding-top:56px"><div class="phone" id="ph"><div class="wall"></div><div class="island"></div>
+  render(`<div class="wrap"><div class="phone" id="ph"><div class="wall"></div><div class="island"></div>
     <div class="clock"><div class="d">${now.toLocaleDateString(undefined,{weekday:"long", month:"long", day:"numeric"})}</div><div class="h" id="clk"></div></div>
     <div class="notes" id="notes"></div><button class="flip" id="flip">TURN THE PHONE FACE DOWN</button></div>
     <div class="phrase" id="phr"></div></div>`);
