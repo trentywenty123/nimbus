@@ -14,7 +14,12 @@
   Press Q at any point after payment to fast-forward whatever is running.
   The ▶▶ button (or ]) finishes the current line of dialogue.
 
-  Cheat codes - type as the USERNAME, password can be blank:
+  DEVELOPERS: type  dev  as the username (or add #dev to the URL) to open the
+  developer menu. It lists every scene and minigame by name with a one-line
+  description, runs any minigame on its own, previews each scare, and shows a
+  toolbar to fast-forward or force a minigame to win/lose.
+
+  Old cheat codes still work - type as the USERNAME, password can be blank:
     layer1  forum        layer2  1997 archive     layer3  doors
     layer4  the name     layer5  the copy         maze    basement
     hack    act one terminal   dark  the dark part   bios  reboot
@@ -396,7 +401,7 @@
   #void .peek{ position:absolute; right:4vw; bottom:6vh; width:min(22vmin,180px); opacity:0; transition:opacity 3s ease }
   #void .peek.on{ opacity:.55 }
   #void .hint{ position:absolute; left:0; right:0; bottom:2vh; text-align:center; font-size:11px; color:#2a3a30; line-height:1 }
-  #skipline{ position:fixed; right:16px; bottom:16px; z-index:86; display:none; font-family:var(--mono); font-size:11px;
+  #skipline{ position:fixed; right:calc(16px + env(safe-area-inset-right,0px)); bottom:calc(16px + env(safe-area-inset-bottom,0px)); z-index:9998; touch-action:manipulation; min-height:44px; display:none; align-items:center; font-family:var(--mono); font-size:12px;
              letter-spacing:.14em; color:#7dffb0; background:rgba(0,0,0,.7); border:1px solid #1f9c46; padding:8px 12px;
              cursor:pointer; user-select:none }
   #skipline:hover{ background:#0a2a15 }
@@ -410,6 +415,22 @@
   #retry button{ font-family:var(--mono); font-size:13px; background:#000; color:#7dffb0; border:1px solid #1f9c46; padding:10px 18px; cursor:pointer; margin:0 6px }
   #retry button:hover{ background:#0a2a15 }
 
+
+  /* ---------- developer menu (username "dev", or add #dev to the URL) ---------- */
+  #devbar{ position:fixed; left:calc(10px + env(safe-area-inset-left,0px)); top:calc(10px + env(safe-area-inset-top,0px)); z-index:9999; display:none; gap:6px; flex-wrap:wrap;
+           font-family:var(--mono); font-size:11px; max-width:calc(100vw - 20px) }
+  #devbar button{ font:inherit; background:#141a00; color:#e6ff4d; border:1px solid #8a9a10; padding:7px 10px; cursor:pointer; touch-action:manipulation }
+  #devbar button.on{ background:#e6ff4d; color:#000 } #devbar button:disabled{ opacity:.35; cursor:default }
+  .devmenu{ max-width:980px; margin:0 auto; padding-top:64px !important; font-family:var(--mono); color:#d8e6d0; padding-bottom:60px }
+  .devmenu h1{ font-size:22px; color:#e6ff4d; letter-spacing:.06em } .devmenu h2{ font-size:14px; color:#e6ff4d; margin:28px 0 4px; letter-spacing:.08em }
+  .devmenu p.lead{ font-size:12px; color:#8fa08a; line-height:1.7; margin-top:8px; max-width:70ch }
+  .devgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; margin-top:10px }
+  .devgrid button{ text-align:left; font:inherit; font-size:12px; background:#0d110a; color:#d8e6d0; border:1px solid #2f3a26; padding:10px 12px; cursor:pointer; line-height:1.5; min-width:0 }
+  .devgrid button:hover, .devgrid button:focus-visible{ border-color:#e6ff4d; outline:none }
+  .devgrid button b{ display:block; color:#e6ff4d; font-weight:600; font-size:13px } .devgrid button small{ color:#7f8c78 }
+  .devrow{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; font-size:12px }
+  .devrow input{ width:auto; flex:1 1 140px; padding:8px 10px; font-size:13px; font-family:var(--mono) }
+  .devrow label{ margin:0; display:flex; white-space:nowrap; gap:8px; align-items:center; color:#d8e6d0; cursor:pointer }
   @media (max-width:640px){
     .wrap{ padding:24px 14px }
     .nav a:not(.on){ display:none }
@@ -493,7 +514,8 @@
 
 <div id="game"></div>
 <canvas id="arena"></canvas>
-<div id="skipline">▶▶ COMPLETE LINE</div>
+<div id="devbar"></div>
+<div id="skipline">NEXT LINE ▶▶</div>
 <div id="void"></div>
 <div id="retry"><h3 id="rtitle">IT CAUGHT YOU</h3><p id="rtext"></p><div><button id="ragain">try again</button><button id="rmove">let it keep a letter and move on</button></div></div>
 <canvas id="scarecv"></canvas>
@@ -580,6 +602,7 @@ const CHEATS = {
   dark:   () => (async () => { const t = render(""); await darkPhase(t); await bios(t); act2Login(); })(),
   bios:   () => (async () => { const t = render(""); await bios(t); act2Login(); })(),
   maze:   () => basement(),
+  dev:    () => DEV.menu(),
   syslog: () => finalTerminal(),
   scare:  () => ending(),
   theend: () => theEnd()
@@ -592,12 +615,16 @@ const pick = a => a[Math.floor(Math.random()*a.length)];
 const rnd = (a,b) => a + Math.floor(Math.random()*(b-a+1));
 const sleep = ms => new Promise(r => setTimeout(r, state.skip ? 0 : ms));
 const tsleep = ms => new Promise(r => setTimeout(r, (state.skip || state.fastLine) ? 0 : ms));
+/* a pause the NEXT LINE button can cut short. it eats the press so one tap = one line. */
+const nap = ms => new Promise(r => { const t0 = Date.now(); const tick = () => {
+  if(state.skip || state.fastLine || Date.now() - t0 >= ms){ state.fastLine = false; r(); } else setTimeout(tick, 30); }; tick(); });
 const SKIP = {
-  show(){ document.getElementById("skipline").style.display = "block"; },
+  show(){ document.getElementById("skipline").style.display = "flex"; },
   hide(){ document.getElementById("skipline").style.display = "none"; state.fastLine = false; }
 };
-document.getElementById("skipline").onclick = () => { state.fastLine = true; AU.click(); };
-addEventListener("keydown", e => { if(e.key === "]" && document.getElementById("skipline").style.display === "block") state.fastLine = true; });
+{ const sk = document.getElementById("skipline"); const press = e => { e.preventDefault(); e.stopPropagation(); state.fastLine = true; AU.click(); };
+  sk.addEventListener("pointerdown", press); sk.addEventListener("click", e => e.stopPropagation()); }
+addEventListener("keydown", e => { if(e.key === "]" && document.getElementById("skipline").style.display === "flex") state.fastLine = true; });
 
 /* ================================================================
    SHADOW — a second cursor. it follows yours. when you stop, it doesn't.
@@ -1386,7 +1413,7 @@ async function darkPhase(t){
   const rt = document.getElementById("ringtext"); let off = 0; const ringTimer = setInterval(() => { off = (off + .12) % 100; rt.setAttribute("startOffset", off + "%"); }, 90);
   wordEl.innerHTML = ""; clock.textContent = ""; sig.classList.remove("on","invert","shake"); eyeL.classList.remove("open"); eyeR.classList.remove("open");
   document.querySelectorAll("#dark .whisper").forEach(w => w.remove());
-  dark.style.display = "block";
+  dark.style.display = "block"; SKIP.show();
   let mx = innerWidth/2, my = innerHeight/2; const track = e => { mx = e.clientX; my = e.clientY; }; addEventListener("mousemove", track);
   const placeEyes = (cx, cy) => { const gap = Math.min(innerWidth*.12, 120); eyeL.style.left = (cx - gap - 60) + "px"; eyeR.style.left = (cx + gap - 60) + "px"; eyeL.style.top = eyeR.style.top = (cy - 30) + "px"; };
   const eyeTimer = setInterval(() => { const dx = (mx - innerWidth/2)/innerWidth*22, dy = (my - innerHeight/2)/innerHeight*22;
@@ -1405,7 +1432,7 @@ async function darkPhase(t){
       if(Math.random() > .55) AU.whisper(fillName(pick(SPOKEN))); await sleep(rnd(2200,4600)); } })();
   await sleep(4000);
   const say = async (txt, cls, wait=2400) => { if(!alive(t)) return; const p = document.createElement("p"); if(cls) p.className = cls; p.textContent = txt;
-    wordEl.appendChild(p); while(wordEl.childElementCount > 3) wordEl.removeChild(wordEl.firstChild); await sleep(wait); };
+    wordEl.appendChild(p); while(wordEl.childElementCount > 3) wordEl.removeChild(wordEl.firstChild); await nap(wait); };
   AU.bell(); await say("TE VIDEO"); await say("i see you", "small", 2600); await say(fullName().toUpperCase(), null, 3000);
   AU.bell(); await say("you are not alone in the room", "small", 3000); await say("NON EST EXITUS", null, 2200); await say("there is no exit", "small", 2800);
   placeEyes(innerWidth/2, innerHeight*.16); eyeL.classList.add("open"); eyeR.classList.add("open"); AU.heartbeat(60);
@@ -1431,7 +1458,7 @@ async function darkPhase(t){
   await SCARE.faceHit(700); SCARE.hide(); await sleep(500);
   await SCARE.staticBurst(120); SCARE.hide(); await sleep(900);
   AU.whisper(fullName()); await SCARE.presence(1400); await sleep(2400);
-  cleanup(); [eyeL,eyeR].forEach(e => { e.style.width = ""; e.style.height = ""; });
+  cleanup(); SKIP.hide(); [eyeL,eyeR].forEach(e => { e.style.width = ""; e.style.height = ""; });
   dark.style.display = "none"; document.querySelector("#dark .heart").style.animation = ""; document.querySelector("#dark .veil").style.background = "";
   return true;
 }
@@ -1468,7 +1495,7 @@ async function bios(t){
 
 async function hack(t){
   tab("root@nimbus:~", "💀");
-  state.skip = false;
+  state.skip = DEV.ff;
   const hackEl = document.getElementById("hack"); hackEl.style.display = "block";
   document.getElementById("boom").style.display = "none"; document.getElementById("clutter").innerHTML = "";
   document.querySelector(".term").style.transform = "translate(-50%,-50%)"; term().innerHTML = "";
@@ -1481,7 +1508,7 @@ async function hack(t){
   hackEl.style.display = "none"; document.getElementById("clutter").innerHTML = "";
   if(alive(t)) await darkPhase(t);
   if(alive(t)) await bios(t);
-  removeEventListener("keydown", skipper); state.skip = false;
+  removeEventListener("keydown", skipper); state.skip = DEV.ff;
   AU.stopAll(); if(!alive(t)) return;
   document.getElementById("dark").style.display = "none"; document.getElementById("bios").style.display = "none";
   state.attempt++;
@@ -1550,6 +1577,7 @@ const ARENA = {
     this.cv.removeEventListener("mousemove", this._mv); this.cv.removeEventListener("mousedown", this._dn); removeEventListener("mouseup", this._up);
     this.cv.removeEventListener("touchmove", this._mv); this.cv.removeEventListener("touchstart", this._dn); removeEventListener("touchend", this._up);
     this.stalkerOn = false; AU.heartbeat(0); MUSIC.stop();
+    if(this._kd){ removeEventListener("keydown", this._kd); removeEventListener("keyup", this._ku); this._kd = this._ku = null; }
   },
   fit(){ const dpr = Math.min(2, window.devicePixelRatio || 1); this.dpr = dpr; this.W = innerWidth; this.H = innerHeight;
     this.cv.width = Math.floor(innerWidth*dpr); this.cv.height = Math.floor(innerHeight*dpr); this.c.setTransform(dpr,0,0,dpr,0,0); },
@@ -1596,6 +1624,8 @@ const ARENA = {
         if(this.hitstop > 0){ this.hitstop -= raw; dt = 0; } this.t += dt;
         const c = this.c; c.save();
         if(this.shake > 0){ c.translate((Math.random()*2-1)*this.shake, (Math.random()*2-1)*this.shake); this.shake = Math.max(0, this.shake - raw*30); }
+        if(this.killed){ this.killed = false; c.restore(); return; }
+        if(!done && DEV.result !== null){ done = {done:true, win:DEV.result, t:0}; DEV.result = null; }
         if(!done){ const r = update(dt, this.clicked); this.clicked = false; if(r && r.done){ done = r; done.t = 0; } }
         else { done.t += raw; this.shake = Math.max(this.shake, (1.6-done.t)*3); }
         this.drawFx(Math.max(dt, raw*.3)); if(!done) this.stalk(raw); if(!this.happy) this.vignette(); this.quiet(raw);
@@ -1661,8 +1691,10 @@ const IT_LINES = {
   close:"YOU ARE DOING VERY WELL. IT WILL NOT MATTER."
 };
 function skin(cls){ document.body.className = cls; }
+voice.id = 0;
 
 async function voice(lines, opts={}){
+  const vid = ++voice.id, live = () => voice.id === vid;
   const hold = opts.hold ?? 1150, v = document.getElementById("void");
   v.style.display = "block"; v.innerHTML = "";
   const bleed = document.getElementById("sigil").cloneNode(true); bleed.removeAttribute("id"); bleed.classList.add("bleed"); bleed.querySelectorAll("[id]").forEach(e => e.removeAttribute("id")); v.appendChild(bleed);
@@ -1673,7 +1705,7 @@ async function voice(lines, opts={}){
   const peek = document.createElement("div"); peek.className = "eye peek"; peek.innerHTML = eyeSVG("P" + rnd(0,99999)); v.appendChild(peek);
   AU.hiss(true, .045);
   const blinkAlone = async ms => { const d = document.createElement("div"); d.className = "dim"; d.textContent = "▌"; box.appendChild(d);
-    const t0 = Date.now(); while(Date.now() - t0 < ms && !skipAll){ d.style.opacity = d.style.opacity === "0" ? "1" : "0"; await sleep(520); } d.remove(); };
+    const t0 = Date.now(); while(Date.now() - t0 < ms && !skipAll && !state.fastLine && live()){ d.style.opacity = d.style.opacity === "0" ? "1" : "0"; await nap(520); } state.fastLine = false; d.remove(); };
   const intrude = async kind => { if(skipAll) return;
     if(kind === "face"){ SCARE.faceFlash(.35); AU.click(); await sleep(60); SCARE.hide(); }
     if(kind === "room"){ await SCARE.flashRoom(rnd(0,2), 80); SCARE.hide(); }
@@ -1687,9 +1719,8 @@ async function voice(lines, opts={}){
       const words = orig.split(" "); words[rnd(0, words.length-1)] = firstName().toUpperCase(); last.textContent = words.join(" "); last.style.color = "#ff2d55"; AU.thump(); await sleep(1200); }
     if(kind === "cut"){ box.style.visibility = "hidden"; bleed.style.visibility = "hidden"; AU.hiss(false); AU.thump(); await sleep(rnd(2200,3600)); box.style.visibility = ""; bleed.style.visibility = ""; AU.hiss(true,.045); }
   };
-  SKIP.show(); await sleep(opts.lead ?? 900);
-  for(let li=0; li<lines.length && !skipAll; li++){
-    state.fastLine = false;
+  SKIP.show(); state.fastLine = false; await nap(opts.lead ?? 900);
+  for(let li=0; li<lines.length && !skipAll && live(); li++){
     const [who, text, after] = lines[li];
     if(who === "pause"){ await blinkAlone(text); continue; }
     if(who === "do"){ await intrude(text); continue; }
@@ -1700,12 +1731,13 @@ async function voice(lines, opts={}){
       if(who === "sys" && i%3===0) AU.click(); if(who === "it" && i%6===0) AU.tick();
       await tsleep(who === "it" ? 34 : 17); }
     d.textContent = body; if(who === "it") AU.thump();
-    if(state.fastLine){ state.fastLine = false; await sleep(300); continue; }
+    state.fastLine = false;                                   // a press during typing finishes the line; the next press moves on
     while(box.childElementCount > 5) box.removeChild(box.firstChild);
     if(after) await intrude(after);
-    await sleep(hold);
+    await nap(hold);
   }
-  state.fastLine = false; await sleep(700); SKIP.hide();
+  if(!live()) return;
+  state.fastLine = false; await sleep(400); SKIP.hide();
   v.style.display = "none"; v.innerHTML = ""; v.ondblclick = null;
   if(opts.end === "snap"){ AU.hit(); await SCARE.presence(500); }
 }
@@ -2098,17 +2130,18 @@ async function theLongDark(){
   AU.stopAll(); AU.ambience(true); AU.drone(true);
   const box = document.createElement("div"); box.style.cssText = "position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;color:#7dffb0;letter-spacing:.05em;text-align:center;line-height:2;z-index:5;padding:0 6vw";
   document.body.appendChild(box);
-  const say = async (txt, ms=60, col="#7dffb0") => { if(!alive(t)) return; const el = document.createElement("div"); el.style.color = col; box.appendChild(el); for(const ch of txt){ if(!alive(t)) return; el.textContent += ch; if(ch !== " ") AU.tick(); await sleep(ms); } };
-  await sleep(5000); await say("the hallway light went out.");
-  await sleep(4000); await say("don't move.");
-  await sleep(8000); AU.footsteps(6, -1, .1);
-  await sleep(6000); await say("it's standing behind your chair. it's been there since the page.", 45, "#5a8a6a");
-  await sleep(3500); await say("don't turn around. it only counts if you turn around.", 45, "#5a8a6a");
+  const say = async (txt, ms=60, col="#7dffb0") => { if(!alive(t)) return; const el = document.createElement("div"); el.style.color = col; box.appendChild(el); for(const ch of txt){ if(!alive(t)) return; el.textContent += ch; if(ch !== " ") AU.tick(); await tsleep(ms); } state.fastLine = false; };
+  SKIP.show();
+  await nap(5000); await say("the hallway light went out.");
+  await nap(4000); await say("don't move.");
+  await nap(8000); AU.footsteps(6, -1, .1);
+  await nap(6000); await say("it's standing behind your chair. it's been there since the page.", 45, "#5a8a6a");
+  await nap(3500); await say("don't turn around. it only counts if you turn around.", 45, "#5a8a6a");
   await sleep(6000); AU.wet(); await sleep(1500); AU.duck(1.4); await sleep(1300);
   if(!alive(t)){ box.remove(); return; }
   SCARE.show(); SCARE.face(.6); AU.stinger(); AU.whisper("you turned around"); await sleep(140); SCARE.hide();
-  await sleep(2500); await say("...okay. okay. it's gone back in. keep going. keep going.", 40);
-  await sleep(2600); box.remove();
+  await nap(2500); await say("...okay. okay. it's gone back in. keep going. keep going.", 40);
+  await nap(2600); box.remove(); SKIP.hide();
 }
 
 /* ================================================================
@@ -2344,7 +2377,7 @@ function mazeGame(assist=0){
     const path = []; let cur = [tx,ty]; if(!prev.has(key(tx,ty))) return path; while(cur){ path.unshift(cur); cur = prev.get(key(cur[0],cur[1])); } return path.slice(1); };
   const los = () => { const dx = P.x-Mo.x, dy = P.y-Mo.y, d = Math.hypot(dx,dy), n = Math.ceil(d*8); for(let i=1;i<n;i++) if(solid(Mo.x+dx*i/n, Mo.y+dy*i/n)) return false; return true; };
   const keys = {}, kd = e => { const k = e.key.toLowerCase(); keys[k] = true; if(k === "f" || k === " ") toggle = true; if(["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"," "].includes(k)) e.preventDefault(); }, ku = e => { keys[e.key.toLowerCase()] = false; };
-  addEventListener("keydown", kd); addEventListener("keyup", ku);
+  addEventListener("keydown", kd); addEventListener("keyup", ku); A._kd = kd; A._ku = ku;
   let secs = 0, bat = 100, fl = true, flick = 1, fT = 0, got = 0, stepT = 0, caught = 0, escaped = 0, toggle = false;
   const RW = 180, FOV = 1.1, zb = new Float32Array(RW), side = new Uint8Array(RW), cellv = new Uint8Array(RW);
   return A.run((dt, clicked) => {
@@ -2447,7 +2480,7 @@ async function finalTerminal(){
   startRain(); AU.hiss(true,.05); AU.drone(true); AU.heartbeat(96); SKIP.show();
   const F = firstName(), N = fullName(), skipper = e => { if(e.key === "q" || e.key === "Q") state.skip = true; };
   addEventListener("keydown", skipper);
-  const finish = () => { removeEventListener("keydown", skipper); state.skip = false; SKIP.hide(); clearInterval(rainTimer); hackEl.style.display = "none"; document.getElementById("rec").style.display = ""; term().style.color = ""; document.querySelector(".term").style.borderColor = ""; };
+  const finish = () => { removeEventListener("keydown", skipper); state.skip = DEV.ff; SKIP.hide(); clearInterval(rainTimer); hackEl.style.display = "none"; document.getElementById("rec").style.display = ""; term().style.color = ""; document.querySelector(".term").style.borderColor = ""; };
   await sleep(1400);
   if(!await ally(t, `${Math.round(state.score)} points of held ground. i counted all of it.`)) return finish();
   if(!await ally(t, "aaron voss held twelve. that was me, in 2021. i wasn't good at this.")) return finish();
@@ -2525,7 +2558,116 @@ function theEnd(){
   setTimeout(again, 62000);
 }
 
-login();
+/* ================================================================
+   DEV — developer menu. Open it by typing  dev  as the username,
+   or by adding  #dev  to the end of the page's URL.
+   Every scene and every minigame is listed with what it is, so you
+   don't need to know the story to find the part you're working on.
+   ================================================================ */
+const DEV = {
+  on:false, result:null, ff:false,
+  /* every story scene, in play order. "start" runs it and the game carries on from there. */
+  SCENES: [
+    ["Act 1", "Sign-in page", "The fake cloud-storage login. Normal start of the game.", () => { state.attempt = 0; login(); }],
+    ["Act 1", "Plans page", "Pick-a-plan page with the joke pricing. Click Pro to continue.", () => plans()],
+    ["Act 1", "Checkout", "Order summary + the 'name for the receipt' fields (this is where the player's name is set).", () => checkout()],
+    ["Act 1", "Payment complete → terminal", "Confetti receipt, then it rolls straight into the hacked terminal.", () => done()],
+    ["Act 1", "Hacked terminal + popup overload", "Green terminal that goes wrong, then the window flood. Q fast-forwards. Leads into the dark part.", () => hack(render(""))],
+    ["Act 1", "The dark part (sigil + eyes)", "Black screen, red sigil, whispering, eyes that follow the cursor, first face scare. Then BIOS.", () => (async () => { const t = render(""); await darkPhase(t); await bios(t); act2Login(); })()],
+    ["Act 1", "BIOS reboot", "Fake boot screen. Ends Act 1 and opens Act 2.", () => (async () => { const t = render(""); await bios(t); act2Login(); })()],
+    ["Act 2", "Layer 1 · Support forum", "Dead forum with the player's thread. Click 'open your thread' → syslog's post → WITNESS minigame.", () => act2Login()],
+    ["Act 2", "Layer 2 · 1997 webring page", "THE NAMES page, guestbook signs itself → ROT BREAKER minigame.", () => layerTwo(true)],
+    ["Act 2", "Layer 3 · Index of doors", "Sign-in page that's slightly wrong, then the doors list → THE HALL stealth minigame.", () => layerThree(true)],
+    ["Act 2", "Layer 4 · The long dark → the name", "Lights-out scene with the face scare, then THE NAME dodge minigame.", () => layerFour(true)],
+    ["Act 2", "Layer 5 · 1998 copy dialog", "Windows 98 'Copying...' → THE COPY minigame → syslog dies.", () => (async () => { await layerFive(); finalTerminal(); })()],
+    ["Ending", "Syslog dies", "The helper's terminal corrupts line by line. Leads into the basement.", () => finalTerminal()],
+    ["Ending", "The basement (story)", "Intro dialogue → first-person BASEMENT minigame → ending.", () => basement()],
+    ["Ending", "Ending sequence", "Name windows, room flashes, slow face, 'goodnight', the last sign-in page.", () => ending()],
+    ["Ending", "Final screen", "The ledger of names. The very end.", () => theEnd()]
+  ],
+  /* each minigame on its own: no story before or after, comes back to this menu */
+  GAMES: [
+    ["WITNESS (layer 1)", "Click forum threads while they're being deleted. Win: survive 5 waves.", 1, () => witnessGame],
+    ["ROT BREAKER (layer 2)", "Brick breaker. Win: burn 40 bricks.", 2, () => breakerGame],
+    ["THE HALL (layer 3)", "Top-down stealth. Click to walk. Win: reach the ⌂ door 5 times.", 3, () => navigateGame],
+    ["THE NAME (layer 4)", "Dodge the letters of your name. Win: survive 40 seconds.", 4, () => nameGame],
+    ["THE COPY (layer 5)", "Ride the file list, grab files, thread gaps. Win: survive 4 waves.", 5, () => exfilGame],
+    ["THE BASEMENT (ending)", "First person. WASD, Shift sprint, F light. Win: 3 fuses, then the door.", 6, () => mazeGame]
+  ],
+  SCARES: [
+    ["Face jump scare", "The full-screen face, after a second of silence.", async () => { await SCARE.faceHit(1200); SCARE.hide(); }],
+    ["Room flashes", "The dark room lit four times, someone closer each time.", async () => { for(let i=0;i<4;i++) await SCARE.flashRoom(i, i === 3 ? 260 : 100); SCARE.hide(); }],
+    ["Eyes in the dark", "Two points of light that blink.", () => SCARE.presence(2000)],
+    ["A letter is taken", "What happens when the player loses: one letter of their name is removed.", () => taking("dev: testing the letter-taking scene.")],
+    ["Retry prompt", "The 'try again / move on' screen shown after losing a round.", () => retryPrompt("dev test").then(again => DEV.toast(again ? "picked: try again" : "picked: move on"))]
+  ],
+  init(){
+    this.bar = document.getElementById("devbar");
+    addEventListener("keydown", e => { if(this.on && e.key === "`") this.menu(); });
+  },
+  enable(){ if(this.on) return; this.on = true; this.bar.style.display = "flex"; this.drawBar(); setInterval(() => this.drawBar(), 500); },
+  drawBar(){
+    const arena = document.getElementById("arena").style.display === "block";
+    const sig = `${arena}|${this.ff}`; if(sig === this._sig) return; this._sig = sig;
+    this.bar.innerHTML = `<button id="dv-menu" title="Back to the developer menu (or press \`)">☰ DEV MENU</button>
+      <button id="dv-ff" class="${this.ff ? "on" : ""}" title="Makes every wait and typing animation instant">⏩ FAST-FORWARD ${this.ff ? "ON" : "OFF"}</button>
+      <button id="dv-win" ${arena ? "" : "disabled"} title="End the current minigame as a win">✓ WIN ROUND</button>
+      <button id="dv-lose" ${arena ? "" : "disabled"} title="End the current minigame as a loss">✕ LOSE ROUND</button>`;
+    document.getElementById("dv-menu").onclick = () => this.menu();
+    document.getElementById("dv-ff").onclick = () => { this.ff = !this.ff; state.skip = this.ff; this._sig = ""; this.drawBar(); };
+    document.getElementById("dv-win").onclick = () => { this.result = true; };
+    document.getElementById("dv-lose").onclick = () => { this.result = false; };
+  },
+  toast(msg){ toast(`<b>DEV</b><br>${esc(msg)}`); },
+  /* stop whatever is running and put the page back to a clean state */
+  reset(){
+    state.skip = this.ff; state.fastLine = false; voice.id++;
+    if(document.getElementById("arena").style.display === "block"){ ARENA.killed = true; ARENA.close(); }
+    ["hack","dark","bios","end","retry","game"].forEach(id => document.getElementById(id).style.display = "none");
+    const v = document.getElementById("void"); v.style.display = "none"; v.innerHTML = "";
+    clearInterval(rainTimer); clearInterval(spamTimer); clearInterval(hudTimer); AU.stopAll(); AU.floor(false); MUSIC.stop();
+    SCARE.hide(); SCARE.atmosphere(false); SKIP.hide();
+    document.body.className = ""; document.body.style.background = ""; document.body.style.filter = "";
+    if(!state.first){ state.first = "Test"; state.last = "Subject"; }
+    if(!state.user) state.user = "tester"; state.attempt = Math.max(state.attempt, 1); if(!state.charged) state.charged = 331.67;
+  },
+  menu(){
+    this.enable(); this.reset(); AU.unlock(); tab("Nimbus — developer menu", "🛠️");
+    document.body.style.background = "#070905";
+    const group = {}; this.SCENES.forEach((s,i) => (group[s[0]] = group[s[0]] || []).push([s,i]));
+    render(`<div class="wrap devmenu">
+      <h1>NIMBUS · DEVELOPER MENU</h1>
+      <p class="lead">Jump to any part of the game without playing through it. <b>Story scenes</b> start at that point and keep going like a normal playthrough.
+        <b>Minigames only</b> run a single game and come back here. The yellow bar at the top-left stays on screen: it returns here (or press <b>\`</b>), turns on fast-forward, and can force a minigame to win or lose.
+        Open this menu any time by typing <b>dev</b> as the username on the sign-in page, or by adding <b>#dev</b> to the end of the URL.</p>
+      <div class="devrow"><span>Test player name:</span><input id="dvf" value="${esc(state.first)}" placeholder="First"><input id="dvl" value="${esc(state.last)}" placeholder="Last">
+        <label><input type="checkbox" id="dvff" ${this.ff ? "checked" : ""} style="width:auto"> fast-forward all waits</label></div>
+      <h2>STORY SCENES — in play order</h2>
+      ${Object.entries(group).map(([act, list]) => `<p class="lead" style="margin-top:14px;color:#c9d48a">${esc(act)}</p><div class="devgrid">${list.map(([s,i]) =>
+        `<button data-scene="${i}"><b>${esc(s[1])}</b>${esc(s[2])}</button>`).join("")}</div>`).join("")}
+      <h2>MINIGAMES ONLY — returns here when the round ends</h2>
+      <div class="devgrid">${this.GAMES.map((g,i) => `<button data-game="${i}"><b>${esc(g[0])}</b>${esc(g[1])}</button>`).join("")}</div>
+      <h2>SCARES — preview one effect</h2>
+      <div class="devgrid">${this.SCARES.map((g,i) => `<button data-scare="${i}"><b>${esc(g[0])}</b>${esc(g[1])}</button>`).join("")}</div>
+      <h2>STATE</h2>
+      <div class="devgrid">
+        <button id="dv-letters"><b>Restore all letters</b><small>Letters taken so far: ${TAKEN.letters.length ? esc(TAKEN.letters.join(" ")) : "none"}</small></button>
+        <button id="dv-reload"><b>Restart from scratch</b><small>Reloads the page (leaves dev mode).</small></button>
+      </div></div>`);
+    const apply = () => { const f = document.getElementById("dvf").value.trim(), l = document.getElementById("dvl").value.trim(); if(f) state.first = f.slice(0,16); if(l) state.last = l.slice(0,16); };
+    document.getElementById("dvff").onchange = e => { this.ff = e.target.checked; state.skip = this.ff; this._sig = ""; this.drawBar(); };
+    document.querySelectorAll("[data-scene]").forEach(b => b.onclick = () => { apply(); AU.click(); this.reset(); const sc = this.SCENES[+b.dataset.scene]; this.toast(`starting: ${sc[1]}`); sc[3](); });
+    document.querySelectorAll("[data-game]").forEach(b => b.onclick = async () => { apply(); AU.click(); this.reset(); const g = this.GAMES[+b.dataset.game];
+      state.layer = g[2]; state.act = 2; DREAD.install(); render(""); document.body.style.background = "#000";
+      const won = await playRound(g[3](), "dev test"); this.toast(`${g[0]}: ${won ? "WON" : "LOST / moved on"}`); this.menu(); });
+    document.querySelectorAll("[data-scare]").forEach(b => b.onclick = async () => { AU.click(); await this.SCARES[+b.dataset.scare][2](); });
+    document.getElementById("dv-letters").onclick = () => { TAKEN.idx.length = 0; TAKEN.letters.length = 0; this.menu(); };
+    document.getElementById("dv-reload").onclick = () => { location.hash = ""; location.reload(); };
+  }
+};
+DEV.init();
+
+if(location.hash === "#dev") DEV.menu(); else login();
 </script>
 </body>
 </html>
