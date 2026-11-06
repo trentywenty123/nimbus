@@ -1,30 +1,35 @@
 <!DOCTYPE html>
 <!--
-  NIMBUS - a horror game dressed up as a joke web page.
+  NIMBUS - a horror game dressed up as a cloud-storage website.
 
-  login -> plans -> checkout -> processing -> payment complete
-        -> fake "hacked" terminal -> popup overload -> the dark part
-        -> fake BIOS reboot -> the layers below -> the basement -> the end
+  ACT 1  the fake website: login -> plans -> checkout -> payment -> the
+         terminal that goes wrong -> the dark part -> BIOS reboot
+  ACT 2  the haunted pages. Each layer is a broken web page with its own
+         Terms of Service: three rules (the RULES button, bottom-left).
+         Breaking a rule costs one letter of your name (top-right).
+           layer 1  support forum   find syslog's 4-digit key
+           layer 2  1997 webring    collect 4 words, sign the guestbook
+           layer 3  index of /doors find the way down to exit/
+           layer 4  the phone       collect a 4-word recovery phrase
+  FINALE account settings. Win letters back by remembering what you read,
+         then choose: keep me signed in / log out / delete account.
+         Three endings. Delete needs your complete name + the phrase.
 
   Nothing here is real and nothing leaves the page: no server, no storage,
-  no network requests, no camera, no microphone. The card, the receipt, the
-  terminal, the popups and the "reboot" are all made up. Use a made-up
-  name and password; the game never reads the password.
+  no network requests, no camera, no microphone. Use a made-up name and
+  password; the game never reads the password.
 
-  The FAST FORWARD button (bottom-right, or Q) appears during dialogue and
-  cutscenes. Turn it on and story text and cutscene waits are instant until
-  it's turned off; the minigames still play normally.
+  FAST FORWARD (bottom-right during dialogue, or Q) makes story text and
+  cutscene waits instant until it's turned off. Rule penalties still show.
 
   DEVELOPERS: type  dev  as the username (or add #dev to the URL) to open the
-  developer menu. It lists every scene and minigame by name with a one-line
-  description, runs any minigame on its own, previews each scare, and shows a
-  toolbar to fast-forward or force a minigame to win/lose.
+  developer menu: every scene by name with a one-line description, scare
+  previews, a test-name field, and a toolbar to fast-forward or add/remove
+  letters so you can test each ending.
 
-  Old cheat codes still work - type as the USERNAME, password can be blank:
-    layer1  forum        layer2  1997 archive     layer3  doors
-    layer4  the name     layer5  the copy         maze    basement
-    hack    act one terminal   dark  the dark part   bios  reboot
-    syslog  green text dies    scare room + face     theend final screen
+  Cheat codes - type as the USERNAME, password can be blank:
+    layer1 forum   layer2 webring   layer3 doors   layer4 phone   finale
+    hack terminal  dark the dark part  bios reboot  syslog  scare  theend
 -->
 <html lang="en">
 <head>
@@ -546,7 +551,7 @@ const PLUS = 29.99;
 const PRO_PRICES = [299.99, 349.99, 429.99, 549.99, 749.99, 1099.99, 1799.99];
 const FEE = 9.99, TAX = 0.07, RUSH = 19.99;
 
-let state = { ff:false, user:"", first:"", last:"", score:0, fastLine:false, attempt:0, charged:0, token:0, skip:false, rush:false, promo:0, act:1, layer:0, deaths:0 };
+let state = { ff:false, broken:0, ending:0, freed:false, user:"", first:"", last:"", score:0, fastLine:false, attempt:0, charged:0, token:0, skip:false, rush:false, promo:0, act:1, layer:0, deaths:0 };
 /* the letters it has taken are gone from everywhere in the game */
 const TAKEN = { idx:[], letters:[] };
 const holed = (str, off) => str.split("").map((ch,i) => TAKEN.idx.includes(i + off) ? "_" : ch).join("");
@@ -564,15 +569,18 @@ function takeLetter(){
 }
 /* the moment of taking: everything stops, one letter, no face */
 async function taking(why){
-  const ch = takeLetter(); if(!ch) return;
-  AU.duck(2.4); AU.floorSwell(2.2); await sleep(900);
+  const w = ms => new Promise(r => setTimeout(r, ms));
+  const ch = takeLetter();
+  if(!ch){ AU.stinger(); await SCARE.presence(1400); return; }
+  AU.duck(2.4); AU.floorSwell(2.2); await w(700);
   SCARE.show(); const c = SCARE.ctx; c.fillStyle = "#000"; c.fillRect(0,0,SCARE.W,SCARE.H);
   c.fillStyle = "#ff2d55"; c.font = `bold ${Math.floor(SCARE.H*.5)}px ui-monospace,Menlo,monospace`; c.textAlign = "center"; c.textBaseline = "middle";
   c.fillText(ch, SCARE.W/2, SCARE.H/2 + SCARE.H*.02); c.textBaseline = "alphabetic";
-  AU.scream(); await sleep(140); c.fillStyle = "#000"; c.fillRect(0,0,SCARE.W,SCARE.H); await sleep(1100);
+  AU.scream(); await w(160); c.fillStyle = "#000"; c.fillRect(0,0,SCARE.W,SCARE.H); await w(900);
   c.fillStyle = "#7dffb0"; c.font = "13px ui-monospace,Menlo,monospace"; c.fillText(why || "it took that.", SCARE.W/2, SCARE.H/2);
   c.fillStyle = "#ff2d55"; c.font = "bold 22px ui-monospace,Menlo,monospace"; c.fillText(fullName().toUpperCase(), SCARE.W/2, SCARE.H/2 + 44);
-  AU.whisper(ch.toLowerCase()); await sleep(2600); SCARE.hide();
+  AU.whisper(ch.toLowerCase()); await w(2200); SCARE.hide();
+
 }
 /* a lost round: try again, or let it keep a letter and go on */
 function retryPrompt(name){
@@ -594,15 +602,14 @@ async function playRound(game, name){
 
 /* ---- cheat codes: type one of these as the USERNAME and hit Sign in. ---- */
 const CHEATS = {
-  layer1: () => act2Login(),
-  layer2: () => layerTwo(true),
-  layer3: () => layerThree(true),
-  layer4: () => layerFour(true),
-  layer5: () => (async () => { await layerFive(); finalTerminal(); })(),
+  layer1: () => act2Login(),            // support forum
+  layer2: () => layerTwo(),             // 1997 webring
+  layer3: () => layerThree(),           // index of /doors/
+  layer4: () => layerFour(),            // the phone
+  finale: () => accountSettings(),      // account settings, three endings
   hack:   () => hack(render("")),
   dark:   () => (async () => { const t = render(""); await darkPhase(t); await bios(t); act2Login(); })(),
   bios:   () => (async () => { const t = render(""); await bios(t); act2Login(); })(),
-  maze:   () => basement(),
   dev:    () => DEV.menu(),
   syslog: () => finalTerminal(),
   scare:  () => ending(),
@@ -681,11 +688,9 @@ const DREAD = {
     });
   },
   onReturn(gone){
-    const arena = document.getElementById("arena").style.display === "block";
-    if(arena){ ARENA.blackout = .9; ARENA.hitstop = .9; ARENA.blackText = pick([`you were gone ${Math.round(gone)} seconds`, "where did you go", "i kept playing for you", `that's ${this.away}, ${firstName().toLowerCase()}`]); ARENA.blackFace = this.away >= 2; AU.duck(1); }
-    else { AU.duck(1.2); setTimeout(() => SCARE.presence(1200), 500); }
+    AU.duck(1.2); setTimeout(() => SCARE.presence(1200), 500);
+    toast(`<b>${esc(pick(["where did you go", "you were gone " + Math.round(gone) + " seconds", "i waited"]))}</b>`);
     if(this.away === 3) setTimeout(() => AU.knock(-.9,3), 2500);
-    if(gone > 15 && state.act >= 2) setTimeout(() => taking(`you were gone ${Math.round(gone)} seconds. it took something while you were out.`), 2600);
   },
   /* one true thing about how you've played, in its voice */
   line(){
@@ -1244,6 +1249,124 @@ const SPOKEN = ["te video","non est exitus","{name}","respice post te","we are h
 const fillName = s => s.replace("{user}", handle()).replace("{name}", fullName()).replace("{first}", firstName());
 function zalgo(s, n=3){ return [...s].map(c => c === " " ? c : c + Array.from({length:rnd(1,n)}, () => pick(MARKS)).join("")).join(""); }
 
+
+/* ================================================================
+   CREATURE — the thing. one drawing, used everywhere it shows up:
+   too tall, too thin, arms that hang past its knees, a head that
+   sits at the wrong angle, and a grin that goes ear to ear.
+   ================================================================ */
+const CREATURE = {
+  /* the head on its own. (x,y) is the centre, s is the head height. */
+  head(c, x, y, s, o={}){
+    const lit = o.lit ?? 1, g = o.grin ?? .7, rx = s*.33, ry = s*.52, t = o.t ?? performance.now()/1000;
+    const tw = Math.sin(t*2.3)*Math.sin(t*5.1) > .8 ? (Math.random()-.5)*.3 : 0;      // stop-motion twitch
+    const A = 30 + 190*lit, skin = k => `rgb(${Math.min(255,A*k)|0},${Math.min(255,A*.94*k)|0},${Math.min(255,A*.84*k)|0})`;
+    const soft = (cx, cy, r, a, sx=1, sy=1) => { c.save(); c.translate(cx, cy); c.scale(sx, sy); const gr = c.createRadialGradient(0,0,0,0,0,r);
+      gr.addColorStop(0, `rgba(0,0,0,${a})`); gr.addColorStop(.55, `rgba(0,0,0,${a*.75})`); gr.addColorStop(1, "rgba(0,0,0,0)"); c.fillStyle = gr; c.beginPath(); c.arc(0,0,r,0,7); c.fill(); c.restore(); };
+    c.save(); c.translate(x, y); c.rotate((o.tilt ?? .3) + tw);
+    // a long skull, a narrow jaw, lit hard from the upper left; the far side is gone
+    const hg = c.createRadialGradient(-rx*.55, -ry*.5, 1, -rx*.1, -ry*.05, ry*1.05);
+    hg.addColorStop(0, skin(1.05)); hg.addColorStop(.35, skin(.72)); hg.addColorStop(.68, skin(.26)); hg.addColorStop(1, "#000");
+    c.fillStyle = hg; c.beginPath(); c.moveTo(0, -ry);
+    c.bezierCurveTo(-rx*1.15, -ry, -rx*1.1, ry*.25, -rx*.62, ry*.72); c.quadraticCurveTo(-rx*.3, ry*1.02, 0, ry*1.04);
+    c.quadraticCurveTo(rx*.3, ry*1.02, rx*.62, ry*.72); c.bezierCurveTo(rx*1.1, ry*.25, rx*1.15, -ry, 0, -ry); c.fill();
+    if(o.detail){
+      c.globalAlpha = .3*lit; c.strokeStyle = "#2e2433"; c.lineWidth = Math.max(1, s*.003);
+      for(let i=0;i<12;i++){ const sx = (i%2 ? 1 : -1)*rx*(.55 + (i%4)*.08), sy = -ry*(.55 - i*.04);
+        c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(sx*.85, sy + s*.04, sx*.7 + Math.sin(i)*s*.02, sy + s*.09); c.stroke(); }
+      for(let i=0;i<60;i++){ c.fillStyle = `rgba(${40+i%40},${20+i%25},${30+i%30},.22)`; c.beginPath(); c.ellipse(Math.sin(i*12.9)*rx*.8, Math.cos(i*7.3)*ry*.8, s*.012*(1+(i%3)), s*.009*(1+(i%2)), i, 0, 7); c.fill(); }
+      c.globalAlpha = 1; }
+    if(o.back){ c.restore(); this.hair(c, x, y, s, o, true); return; }
+    soft(-rx*.58, ry*.38, rx*.42, .55*lit + .2, 1, 1.5); soft(rx*.58, ry*.38, rx*.42, .7, 1, 1.5);            // hollow cheeks
+    soft(0, -ry*.3, rx*1.05, .45, 1, .35);                                                                    // brow shadow
+    // eyes: holes. soft at the edge, black all the way down, and something very small and wet at the bottom
+    const L = [-rx*.42, -ry*.1, rx*.3, ry*.24], R = [rx*.4, -ry*.06, rx*.26, ry*.27];
+    for(const [ex, ey, ew, eh] of [L, R]){ soft(ex, ey, Math.max(ew, eh)*1.5, .95, ew/Math.max(ew,eh), eh/Math.max(ew,eh));
+      c.fillStyle = "#000"; c.beginPath(); c.ellipse(ex, ey, ew*.82, eh*.82, 0, 0, 7); c.fill(); }
+    if(o.detail){ c.strokeStyle = "rgba(0,0,0,.9)"; c.lineCap = "round";
+      for(const [ex, ey, len, wdt] of [[-rx*.5, ry*.08, ry*.6, .011], [-rx*.34, ry*.1, ry*.38, .007], [rx*.44, ry*.15, ry*.7, .012]]){ c.lineWidth = s*wdt; c.beginPath(); c.moveTo(ex, ey); c.quadraticCurveTo(ex + s*.01, ey + len*.5, ex - s*.004, ey + len); c.stroke(); } }
+    if(o.eyes !== false){ const e = Math.max(1, s*.0065), f = .55 + .45*Math.random();
+      c.fillStyle = `rgba(255,246,225,${f})`; c.beginPath(); c.arc(L[0] + rx*.02, L[1] + ry*.03, e, 0, 7); c.fill(); c.beginPath(); c.arc(R[0] - rx*.03, R[1] + ry*.05, e*.85, 0, 7); c.fill(); }
+    c.fillStyle = "rgba(0,0,0,.85)"; c.beginPath(); c.ellipse(-rx*.06, ry*.2, rx*.025, ry*.04, .35, 0, 7); c.fill(); c.beginPath(); c.ellipse(rx*.06, ry*.2, rx*.025, ry*.04, -.35, 0, 7); c.fill();
+    // the grin, ear to ear, with too many teeth and none of them the same
+    if(g > 0){
+      const y0 = ry*.32, yU = ry*(.4 + g*.1), yL = ry*(.46 + g*.5), X = rx*1.02;
+      const lipU = u => (1-u)*(1-u)*y0 + 2*u*(1-u)*yU + u*u*y0, lipL = u => (1-u)*(1-u)*y0 + 2*u*(1-u)*yL + u*u*y0, xs = u => -X + u*2*X;
+      c.fillStyle = "#050000"; c.beginPath(); c.moveTo(-X, y0); c.quadraticCurveTo(0, yL, X, y0); c.quadraticCurveTo(0, yU, -X, y0); c.fill();
+      c.strokeStyle = `rgba(70,6,10,${.7})`; c.lineWidth = Math.max(1, s*.006); c.beginPath(); c.moveTo(-X, y0); c.quadraticCurveTo(0, yU, X, y0); c.stroke();
+      const tooth = (u, top, len, wd, down) => { const x0 = xs(u); c.beginPath(); c.moveTo(x0 - wd/2, top); c.lineTo(x0 + wd/2, top); c.lineTo(x0 + wd*.1, top + (down ? len : -len)); c.closePath(); c.fill(); };
+      const n = 22; for(let i=1;i<n;i++){ const u = i/n, r1 = Math.abs(Math.sin(i*12.9898)), r2 = Math.abs(Math.sin(i*78.233));
+        if(r1 < .12) continue;                                                                                  // gaps
+        const shade = .7 + r2*.35; c.fillStyle = `rgb(${A*shade*1.05|0},${A*shade*.98|0},${A*shade*.72|0})`;
+        const gap = lipL(u) - lipU(u);
+        tooth(u, lipU(u), Math.min(gap*.6, ry*(.05 + r1*.09))*(.4 + g*.6), rx*(.05 + r2*.05), true);
+        tooth(u + .02, lipL(u), Math.min(gap*.5, ry*(.04 + r2*.07))*(.4 + g*.6), rx*(.045 + r1*.04), false); }
+    }
+    c.restore(); this.hair(c, x, y, s, o, false);
+  },
+  hair(c, x, y, s, o, back){
+    const rx = s*.33, ry = s*.52; c.save(); c.translate(x, y); c.rotate(o.tilt ?? .3); c.lineCap = "round";
+    const n = back ? 46 : 34;
+    for(let i=0;i<n;i++){
+      const side = i % 2 ? 1 : -1, k = (i >> 1) / (n/2);
+      const a = back ? -Math.PI*.97 + i/n*Math.PI*1.94 : (side < 0 ? -Math.PI + k*.55 : -k*.55);   // from the crown, down the sides, not over the face
+      const sx = Math.cos(a)*rx*.92, sy = Math.sin(a)*ry*.95 - ry*.05, len = ry*(back ? 1.5 : .8 + (i%5)*.16);
+      c.strokeStyle = `rgba(${4+i%6},${3+i%4},${3+i%4},${.75 + (i%3)*.08})`; c.lineWidth = Math.max(1, s*.0035*(1 + (i%3)*.6));
+      c.beginPath(); c.moveTo(sx, sy); c.bezierCurveTo(sx + side*rx*.12, sy + len*.3, sx + side*rx*(.05 + Math.sin(i)*.1), sy + len*.65, sx + side*rx*(.1 + Math.sin(i*2.7)*.08), sy + len); c.stroke(); }
+    if(!back){ c.strokeStyle = "rgba(3,2,2,.9)";                                                      // three strands fall across the face
+      for(let i=0;i<3;i++){ c.lineWidth = Math.max(1, s*.004); const sx = -rx*(.2 - i*.15); c.beginPath(); c.moveTo(sx, -ry*.92); c.bezierCurveTo(sx - rx*.1, -ry*.4, sx + rx*.05, -ry*.05, sx - rx*.04, ry*(.25 + i*.12)); c.stroke(); } }
+    c.restore();
+  },
+  /* the whole thing standing. (x,y) is between its feet, h its height. */
+  draw(c, x, y, h, o={}){
+    const lit = o.lit ?? 1, w = h*.15, A = 30 + 190*lit, skin = k => `rgb(${A*k|0},${A*.95*k|0},${A*.86*k|0})`, t = o.t ?? performance.now()/1000;
+    c.save(); c.translate(x, y); c.lineCap = "round"; c.lineJoin = "round";
+    if(o.blur) c.filter = `blur(${o.blur}px)`;
+    const body = c.createLinearGradient(-w*.8, 0, w*.8, 0); body.addColorStop(0, skin(.9)); body.addColorStop(.5, skin(.5)); body.addColorStop(1, "#000");
+    c.fillStyle = "rgba(0,0,0,.4)"; c.beginPath(); c.ellipse(0, 0, w*1.3, w*.2, 0, 0, 7); c.fill();
+    c.strokeStyle = body;
+    [-1,1].forEach(s => { c.lineWidth = w*.16; c.beginPath(); c.moveTo(s*w*.22, -h*.47); c.lineTo(s*w*.34, -h*.26); c.lineTo(s*w*.2, -h*.02); c.stroke();
+      c.lineWidth = w*.1; c.beginPath(); c.moveTo(s*w*.2, -h*.02); c.lineTo(s*w*.5, 0); c.stroke(); });
+    c.fillStyle = body; c.beginPath(); c.moveTo(-w*.62, -h*.74); c.quadraticCurveTo(0, -h*.775, w*.62, -h*.74);
+    c.quadraticCurveTo(w*.4, -h*.6, w*.22, -h*.5); c.lineTo(w*.3, -h*.45); c.lineTo(-w*.3, -h*.45); c.lineTo(-w*.22, -h*.5); c.quadraticCurveTo(-w*.4, -h*.6, -w*.62, -h*.74); c.fill();
+    if(lit > .25 && !o.back){ c.strokeStyle = `rgba(0,0,0,${.4*lit})`; c.lineWidth = Math.max(1, w*.035);
+      for(let i=0;i<5;i++){ const yy = -h*(.69 - i*.04); c.beginPath(); c.moveTo(-w*(.4 - i*.04), yy); c.quadraticCurveTo(0, yy + h*.02, w*(.4 - i*.04), yy); c.stroke(); } }
+    const reach = o.reach || 0;
+    [-1,1].forEach(s => { const sh = [s*w*.6, -h*.73], el = [s*w*.82, -h*.5 - reach*h*.1], wr = [s*w*(.74 - reach*.2), -h*.22 - reach*h*.32];
+      c.strokeStyle = body; c.lineWidth = w*.11; c.beginPath(); c.moveTo(...sh); c.lineTo(...el); c.lineTo(...wr); c.stroke();
+      c.lineWidth = Math.max(1, w*.03);
+      for(let f=0; f<4; f++){ const a = Math.PI/2 - s*(.45 - f*.22) - reach*1.2; c.beginPath(); c.moveTo(...wr);
+        c.quadraticCurveTo(wr[0] + Math.cos(a)*w*.25, wr[1] + Math.sin(a)*w*.25, wr[0] + Math.cos(a)*w*.42, wr[1] + Math.sin(a)*w*.75); c.stroke(); } });
+    const tilt = o.tilt ?? .32, hx = Math.sin(tilt)*h*.07, hy = -h*.875;
+    c.strokeStyle = body; c.lineWidth = w*.1; c.beginPath(); c.moveTo(0, -h*.74); c.quadraticCurveTo(hx*.2, -h*.8, hx, hy + h*.04); c.stroke();
+    c.filter = "none";
+    this.head(c, hx, hy, w*1.05, {...o, lit, t});
+    c.restore();
+  },
+  /* a picture of it, as an image URL, for pages that want to show it (photos, GIFs, avatars) */
+  cache:new Map(),
+  img(kind, w=240, h=180){
+    const key = kind + w + "x" + h; if(this.cache.has(key)) return this.cache.get(key);
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h; const c = cv.getContext("2d");
+    const film = (a=40) => { const im = c.getImageData(0,0,w,h), d = im.data; for(let i=0;i<d.length;i+=4){ const n = (Math.random()-.5)*a; d[i]+=n; d[i+1]+=n; d[i+2]+=n; } c.putImageData(im,0,0); };
+    const room = (light=.25) => { const g = c.createRadialGradient(w*.5, h*.3, 4, w*.5, h*.5, w*.8); g.addColorStop(0, `rgba(${90*light*3|0},${80*light*3|0},${70*light*3|0},1)`); g.addColorStop(1, "#050404");
+      c.fillStyle = g; c.fillRect(0,0,w,h); c.fillStyle = "rgba(0,0,0,.45)"; c.fillRect(0, h*.72, w, h*.28); c.fillStyle = "rgba(0,0,0,.6)"; c.fillRect(w*.12, h*.18, w*.16, h*.54); };
+    const [type, arg] = kind.split(":"); const n = +arg || 0;
+    if(type === "photo"){                       // a hallway photo; it is further away in the early ones
+      room(.22); const fh = h*(.28 + n*.2), fx = w*(.78 - n*.1), fy = h*(.72 + n*.07);
+      CREATURE.draw(c, fx, fy, fh, {lit: .28 + n*.12, grin: n >= 3 ? 1 : .3, blur: n < 2 ? 1 : .4, eyes: n >= 1, t: 1.3});
+      if(n >= 3){ c.fillStyle = "rgba(255,255,255,.06)"; c.fillRect(0,0,w,h); } film(46);
+      c.fillStyle = "#ff8a00"; c.font = "bold 9px monospace"; c.fillText(`'97 ${String(n+3).padStart(2,"0")} 12  03:3${n}`, w - 92, h - 8);
+    }
+    if(type === "stare"){                       // a tiny animated-GIF-sized thing that is facing you
+      c.fillStyle = "#000"; c.fillRect(0,0,w,h); CREATURE.head(c, w/2, h*.52, h*.8, {lit:.9, grin:.9, tilt:.15, t:2}); film(30); }
+    if(type === "avatar"){ c.fillStyle = "#0a0808"; c.fillRect(0,0,w,h); CREATURE.head(c, w/2, h*.56, h*.9, {lit:.7, grin: n ? 1 : .2, tilt:.35, t:5}); film(36); }
+    if(type === "door"){ room(.12); c.fillStyle = "#000"; c.fillRect(w*.4, h*.2, w*.2, h*.52); CREATURE.draw(c, w*.5, h*.72, h*.5, {lit:.18, grin:.8, blur:.6, t:3}); film(50); }
+    if(type === "mirror"){ room(.3); c.fillStyle = "#1a1a1e"; c.fillRect(w*.3, h*.1, w*.4, h*.62); CREATURE.draw(c, w*.52, h*.72, h*.58, {lit:.45, grin:1, t:4, back: n === 0}); film(40); }
+    const url = cv.toDataURL("image/png"); this.cache.set(key, url); return url;
+  }
+};
+
 const SCARE = {
   cv:null, ctx:null, off:null, octx:null, W:0, H:0, doorOpen:0, faceBudget:3,
   init(){ this.cv = document.getElementById("scarecv"); this.ctx = this.cv.getContext("2d"); this.off = document.createElement("canvas"); this.octx = this.off.getContext("2d"); this.fit(); },
@@ -1284,26 +1407,7 @@ const SCARE = {
     c.restore(); this.vignette(c, W, H, lit ? .82 : .95); this.grain(c, lit ? 30 : 14, W, H); this.ctx.drawImage(this.off, 0, 0);
   },
   figure(c, conf, lit){
-    const fh = conf.h, fw = fh*conf.w, turn = conf.turn || 0;
-    c.save(); c.translate(conf.x, conf.y); c.rotate(conf.lean||0); c.filter = `blur(${Math.min(3, fh*.004)}px)`;
-    c.fillStyle = "rgba(0,0,0,.22)"; c.beginPath(); c.ellipse(0, 8, fw*.55, fw*.14, 0, 0, 6.3); c.fill();
-    c.fillStyle = "#000"; c.strokeStyle = "#000"; c.lineCap = "round";
-    [-.14,.12].forEach((lx,i) => { c.beginPath(); c.moveTo(fw*lx, 0); c.quadraticCurveTo(fw*(lx+.04*(i?1:-1)), -fh*.16, fw*(lx-.02*(i?1:-1)), -fh*.38); c.lineWidth = fw*.13; c.stroke(); });
-    c.beginPath(); c.moveTo(-fw*.44, -fh*.37); c.bezierCurveTo(-fw*.40, -fh*.52, -fw*.36, -fh*.64, -fw*.28, -fh*.72);
-    c.bezierCurveTo(-fw*.20, -fh*.80, fw*.20, -fh*.80, fw*.28, -fh*.72); c.bezierCurveTo(fw*.36, -fh*.64, fw*.40, -fh*.52, fw*.44, -fh*.37); c.closePath(); c.fill();
-    [[-1,-.03],[1,.04]].forEach(([sg, lean]) => { const sh = [-fw*.36*sg, -fh*.72], el = [-fw*.50*sg + lean*fw*.08, -fh*.52], hd = [-fw*.52*sg, -fh*.24];
-      c.lineWidth = fw*.11; c.beginPath(); c.moveTo(...sh); c.lineTo(...el); c.stroke(); c.lineWidth = fw*.09; c.beginPath(); c.moveTo(...el); c.lineTo(...hd); c.stroke();
-      c.lineWidth = fw*.025; for(let f=0;f<4;f++){ const a = -.6+f*.38+sg*.2; c.beginPath(); c.moveTo(hd[0], hd[1]); c.lineTo(hd[0]+Math.cos(a)*fw*.15, hd[1]+Math.abs(Math.sin(a))*fw*.15+fw*.04); c.stroke(); }
-      if(lit){ c.fillStyle = "rgba(120,105,92,.45)"; c.beginPath(); c.ellipse(hd[0],hd[1]+fw*.03,fw*.035,fw*.06,sg*.4,0,6.3); c.fill(); c.fillStyle = "#000"; } });
-    c.lineWidth = fw*.05; c.beginPath(); c.moveTo(0,-fh*.78); c.lineTo(0,-fh*.86); c.stroke();
-    c.save(); c.translate(0,-fh*.90); c.rotate(.10 - turn*.12); c.beginPath(); c.ellipse(0,0, fh*.082, fh*.106, 0, 0, 6.3); c.fill();
-    if(lit){ const sk = c.createRadialGradient(-fh*.03,-fh*.03,fh*.01,0,0,fh*.11); sk.addColorStop(0, turn>0 ? "#b7a898" : "#8a7d70"); sk.addColorStop(.6,"#3a322c"); sk.addColorStop(1,"rgba(0,0,0,0)");
-      c.fillStyle = sk; c.beginPath(); c.ellipse(0,0, fh*.078, fh*.102, 0, 0, 6.3); c.fill(); }
-    c.strokeStyle = "rgba(4,3,3,.9)"; for(let i=0;i<20;i++){ const a = -1.6+i*.18, rx = Math.cos(a)*fh*.07, ry = -fh*.06+Math.sin(a)*fh*.03; c.lineWidth = fh*.006;
-      c.beginPath(); c.moveTo(rx,ry); c.bezierCurveTo(rx+Math.sin(i)*fh*.05, ry+fh*.03, rx+Math.cos(i+1)*fh*.04, ry+fh*.07, rx+Math.sin(i*.7)*fh*.04, ry+fh*.11); c.stroke(); }
-    if(lit && turn > 0){ c.fillStyle = "rgba(205,198,188,.44)"; c.beginPath(); c.ellipse(-fh*.030,-fh*.010,fh*.014,fh*.010,0,0,6.3); c.fill();
-      c.beginPath(); c.ellipse(fh*.030,-fh*.010,fh*.012,fh*.009,0,0,6.3); c.fill(); c.fillStyle = "rgba(0,0,0,.92)"; c.beginPath(); c.ellipse(0,fh*.040,fh*.026,fh*.038,0,0,6.3); c.fill(); }
-    c.restore(); c.filter = "none"; c.restore();
+    CREATURE.draw(c, conf.x, conf.y, conf.h*1.1, {lit: lit ? .6 : .05, grin: conf.turn ? 1 : 0, back: !conf.turn, tilt: .38 + (conf.lean||0)*3, blur: lit ? .8 : 2, reach: conf.turn ? .6 : 0});
   },
   /* the dark, and two points of light that are looking at you */
   async presence(ms=900){
@@ -1338,44 +1442,11 @@ const SCARE = {
   },
   /* the face: one hard light from the upper left, the far side lost to black, then degraded like a phone photo in the dark */
   face(p){
-    const c = this.octx, W = this.W, H = this.H, tremor = p > .55 ? (Math.random()-.5)*p*6 : 0;
-    const s = Math.min(W,H) * (.44 + p*.26) * (1 + Math.sin(Date.now()/430) * .010), cx = W/2 + tremor, cy = H*.50 + tremor*.6, jaw = p*.45, hw = s*.72;
+    const c = this.octx, W = this.W, H = this.H;
     c.filter = "none"; c.fillStyle = "#000"; c.fillRect(0,0,W,H);
-    const soft = px => { c.filter = `blur(${Math.min(12, Math.max(.5, px))}px)`; }, hard = () => { c.filter = "none"; };
-    const ell = (x,y,rx,ry,r,fill) => { c.fillStyle = fill; c.beginPath(); c.ellipse(x,y,rx,ry,r||0,0,6.3); c.fill(); };
-    c.save(); c.translate(cx,cy); soft(s*.05);
-    const skin = c.createRadialGradient(-s*.30, -s*.40, s*.05, -s*.05, 0, s*1.25);
-    skin.addColorStop(0,"#b9a58f"); skin.addColorStop(.22,"#8f7c69"); skin.addColorStop(.48,"#584a3e"); skin.addColorStop(.72,"#231d19"); skin.addColorStop(1,"#040303");
-    c.fillStyle = skin; c.beginPath(); c.moveTo(0,-s);
-    c.bezierCurveTo(-hw*1.05,-s, -hw*1.12, s*.05, -hw*.78, s*.52); c.bezierCurveTo(-hw*.55, s*.88, -hw*.25, s*(1.02+jaw*.3), 0, s*(1.04+jaw*.35));
-    c.bezierCurveTo( hw*.25, s*(1.02+jaw*.3), hw*.55, s*.88, hw*.78, s*.52); c.bezierCurveTo( hw*1.12, s*.05, hw*1.05,-s, 0,-s); c.closePath(); c.fill();
-    soft(s*.12); const fall = c.createLinearGradient(-hw*.1,0,hw*1.1,0); fall.addColorStop(0,"rgba(0,0,0,0)"); fall.addColorStop(1,"rgba(0,0,0,.92)"); c.fillStyle = fall; c.fillRect(-hw*.2,-s*1.1,hw*1.5,s*2.4);
-    soft(s*.03); for(let i=0;i<60;i++){ const a = Math.random()*7, r = Math.random()*s*.9; ell(Math.cos(a)*r*.75, Math.sin(a)*r, rnd(4,16), rnd(3,12), a, `rgba(${rnd(60,120)},${rnd(40,80)},${rnd(35,70)},${(.04+Math.random()*.08).toFixed(2)})`); }
-    soft(s*.07); ell(0, -s*.30, hw*.95, s*.16, 0, "rgba(0,0,0,.55)");
-    soft(s*.06); [-1,1].forEach(g => { ell(g*s*.30, -s*.12, s*.20, s*.14, 0, "rgba(0,0,0,.72)"); ell(g*s*.30, s*.03, s*.16, s*.06, 0, "rgba(20,10,10,.45)"); });
-    soft(s*.05); ell(-s*.05, s*.05, s*.06, s*.28, .1, "rgba(0,0,0,.3)"); soft(s*.03); ell(-s*.10, -s*.05, s*.035, s*.22, .12, "rgba(200,180,160,.20)");
-    soft(s*.04); ell(-s*.07, s*.30, s*.075, s*.05, 0, "rgba(0,0,0,.6)");
-    soft(s*.08); [-1,1].forEach(g => ell(g*s*.48, s*.32, s*.14, s*.30, g*.2, "rgba(0,0,0,.45)"));
-    const my = s*.62, mh = s*(.03 + jaw*.22);
-    soft(s*.02); ell(0, my - s*.02, s*.27, s*.055, 0, "rgba(90,55,55,.55)"); ell(0, my + mh + s*.04, s*.24, s*.05, 0, "rgba(120,75,70,.45)");
-    soft(s*.015); ell(0, my + mh*.5, s*.26, mh + s*.012, 0, "#050202");
-    if(jaw > .15){ hard(); c.fillStyle = "rgba(215,205,190,.85)"; for(let i=-4;i<=4;i++){ if(Math.abs(i)===3 && p>.6) continue; c.fillRect(i*s*.052 - s*.02, my - s*.01, s*.038, s*(.035+Math.random()*.02)); } }
-    [-1,1].forEach((g,i) => { const ex = g*s*.30, ey = -s*.12, open = s*(.032 + p*.09);
-      c.save(); hard(); c.beginPath(); c.ellipse(ex, ey, s*.135, open, 0,0,7); c.clip();
-      soft(s*.01); ell(ex, ey, s*.135, s*.10, 0, i ? "#8c8378" : "#b8ada0"); const irx = ex + Math.sin(p*5+i)*s*.015 - s*.01;
-      soft(s*.006); ell(irx, ey, s*.058, s*.058, 0, "#2a1b14"); ell(irx, ey, s*.026, s*.026, 0, "#000");
-      hard(); ell(irx - s*.022, ey - s*.02, s*.012, s*.009, 0, i ? "rgba(255,255,255,.35)" : "rgba(255,255,255,.75)"); c.restore(); });
-    if(p > .35){ const bl = (p-.35)/.65; hard(); c.lineCap = "round";
-      [-1,1].forEach((g,i) => { const ex = g*s*.30, ey = -s*.07; c.strokeStyle = `rgba(80,6,10,${.85*bl})`;
-        for(let k=0;k<3;k++){ const x0 = ex - s*.05 + k*s*.045, len = s*(.25 + bl*.5 + k*.1); c.lineWidth = s*(.014+k*.006);
-          c.beginPath(); c.moveTo(x0, ey); c.quadraticCurveTo(x0 + Math.sin(k*2.1+i)*s*.03, ey + len*.5, x0 + Math.cos(k*1.3)*s*.02, ey + len); c.stroke(); } });
-      soft(s*.012); ell(0, s*.78, s*.16, s*(.06+bl*.12), 0, `rgba(80,6,8,${.6*bl})`); }
-    soft(s*.05); ell(0, -s*.72, hw*1.02, s*.42, 0, "#070505");
-    soft(s*.012); c.strokeStyle = "rgba(4,3,3,.9)";
-    for(let i=0;i<40;i++){ const x0 = -hw*.9 + i*hw*.045; c.lineWidth = s*(.006+Math.random()*.008); c.beginPath(); c.moveTo(x0, -s*.98);
-      c.bezierCurveTo(x0 + Math.sin(i+p*4)*s*.05, -s*.66, x0 - Math.cos(i)*s*.05, -s*.48, x0 + Math.sin(i*2)*s*.04, -s*(.34 - Math.random()*.2)); c.stroke(); }
-    soft(s*.05); ell(0, s*1.25, s*.32, s*.45, 0, "#120d0b");
-    hard(); c.restore(); this.vignette(c, W, H, .85);
+    const sz = Math.min(W*1.25, H) * (.92 + p*.5), shake = p > .5 ? (Math.random()-.5)*p*10 : 0;
+    CREATURE.head(c, W/2 + shake, H*.53 + shake*.5, sz, {lit: .62 + p*.3, grin: .3 + p*.7, tilt: .26 - p*.2, detail: true});
+    this.vignette(c, W, H, .88);
     const o = this.ctx; o.save(); o.filter = `blur(${.6 + p*.5}px) contrast(1.15) brightness(${.9 + p*.25}) saturate(.75)`; o.drawImage(this.off, 0, 0); o.restore(); o.filter = "none";
     if(p > .3 && Math.random() < p*.5){ o.globalAlpha = .35; o.drawImage(this.off, (Math.random()-.5)*p*14, (Math.random()-.5)*p*6); o.globalAlpha = 1; }
     this.slice(o, 3 + p*30, W, H, 2 + Math.floor(p*10)); this.aberrate(o, Math.round(1 + p*4), W, H); this.grain(o, 34 + p*24, W, H);
@@ -1522,162 +1593,6 @@ async function hack(t){
 }
 
 /* ================================================================
-   MUSIC — a tiny step sequencer on the audio clock
-   ================================================================ */
-const midi = m => 440 * Math.pow(2, (m-69)/12);
-const MUSIC = {
-  timer:null, step:0, track:null, bpm:120, bar:0, next:0,
-  play(track){ this.stop(); if(!AU.ok()) return; this.track = track; this.bpm = track.bpm; this.step = 0; this.bar = 0; this.next = AU.ctx.currentTime + .06;
-    const sched = () => { if(!this.track) return; const now = AU.ctx.currentTime;
-      while(this.next < now + .14){ this.playStep(this.step, this.next); this.step++; if(this.step % 16 === 0) this.bar++; this.next += 60 / this.bpm / 4; }
-      this.timer = setTimeout(sched, 30); };
-    sched(); },
-  playStep(step, at){ const t = this.track, s = step % 16; if(!AU.ok()) return;
-    const B = t.lead2 && (this.bar % 4 >= 2), fill = t.snare && this.bar % 4 === 3 && s >= 12;
-    if(t.pc){ const L = B ? t.lead2 : t.lead; if(L[s]) AU.pcbeep(midi(L[s]), 60/this.bpm/4*.8); if(t.kick && t.kick[s]) AU.thumpAt(at, 60, 40, .25); return; }
-    if(t.kick[s]) AU.thumpAt(at, t.kickF || 70, 35, t.kickPeak || .55);
-    if(t.hat && t.hat[s]) AU.noiseAt(at, .03, "highpass", 6000, s % 4 === 0 ? .1 : .06, .001, .025);
-    if(fill ? s % 2 === 0 : (t.snare && t.snare[s])) AU.noiseAt(at, .12, "bandpass", 1800, fill ? .12 : .16, .002, .11);
-    if(t.bass && t.bass[s]) AU.toneAt(at, midi(t.bass[s]), t.bassWave || "triangle", .01, t.bassPeak || .13, .22);
-    const lead = B ? t.lead2 : t.lead; if(lead && lead[s]) AU.toneAt(at, midi(lead[s]), t.leadWave || "square", .005, t.leadPeak || .06, t.leadDecay || .16);
-    if(t.pad && s === 0) (t.padNotes || [0,7,10]).forEach(i => AU.toneAt(at, midi(t.pad + i), t.padWave || "sawtooth", .4, .025, 2.2)); },
-  setTempo(b){ this.bpm = b; },
-  stop(){ clearTimeout(this.timer); this.timer = null; this.track = null; }
-};
-const TRACKS = {
-  happy:  { bpm:172, kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], kickF:110, kickPeak:.4, hat:[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], bass:[48,0,55,0,48,0,55,0,53,0,60,0,55,0,62,0], bassPeak:.16,
-            lead:[72,0,76,0,79,0,84,0,79,0,76,0,72,0,67,0], lead2:[77,0,81,0,84,0,81,0,79,0,76,0,72,0,74,0], leadPeak:.07, leadDecay:.12,
-            pad:60, padNotes:[0,4,7], padWave:"triangle" },
-  dos:    { bpm:96, pc:true, kick:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
-            lead:[57,0,60,0,64,0,60,0,57,0,60,0,63,0,60,0], lead2:[56,0,60,0,64,0,60,0,55,0,59,0,62,0,59,0] },
-  phone:  { bpm:140, kick:[1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0], kickF:60, kickPeak:.7, hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,1],
-            snare:[0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], bass:[33,0,0,0,0,0,33,0,0,0,36,0,0,0,31,0], bassWave:"sine", bassPeak:.22,
-            lead:[81,0,0,0,0,0,0,0,84,0,0,0,0,0,80,0], lead2:[81,0,0,0,88,0,0,0,84,0,0,0,80,0,79,0], leadWave:"sine", leadPeak:.09, leadDecay:.6,
-            pad:33, padNotes:[0,3,7,10], padWave:"triangle" },
-  copy:   { bpm:128, kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,1], kickF:90, hat:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],
-            snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], bass:[38,0,38,0,0,38,0,0,41,0,0,41,0,0,36,36], bassWave:"sawtooth",
-            lead:[0,0,0,0,62,0,0,0,0,0,0,0,65,0,64,0], lead2:[0,0,62,0,0,0,65,0,0,0,69,0,0,0,68,0], leadWave:"sawtooth", pad:38 }
-};
-
-/* ================================================================
-   ARENA — one canvas, one loop
-   ================================================================ */
-const ARENA = {
-  cv:null, c:null, W:0, H:0, mx:0, my:0, down:false, clicked:false, parts:[], shake:0, flashA:0, flashC:"#fff", texts:[], t:0, dpr:1,
-  hitstop:0, slow:1, blackout:0, blackText:"", blackFace:false, dreadT:0, nextDread:30, silence:false, happy:false, silT:0, silHold:0, silNext:20, stalker:null, stalkerOn:false, tearT:0,
-  open(){
-    DREAD.install(); state.act = Math.max(state.act, 2); SHADOW.on();
-    if((state.layer||0) >= 3){ AU.ambience(true); SCARE.atmosphere(true); AU.floor(true); } else { AU.ambience(false); SCARE.atmosphere(false); }
-    this.cv = document.getElementById("arena"); this.c = this.cv.getContext("2d");
-    this.fit(); this.cv.style.display = "block"; this.parts = []; this.texts = []; this.shake = 0; this.flashA = 0; this.stalker = null; this._hpGhost = undefined;
-    this._res = () => this.fit(); addEventListener("resize", this._res);
-    const pos = e => { const r = this.cv.getBoundingClientRect(), p = e.touches ? e.touches[0] : e; if(!p) return; this.mx = (p.clientX - r.left) * this.W / r.width; this.my = (p.clientY - r.top) * this.H / r.height; };
-    this._mv = e => pos(e); this._dn = e => { pos(e); this.down = true; this.clicked = true; e.preventDefault(); }; this._up = () => { this.down = false; };
-    this.cv.addEventListener("mousemove", this._mv); this.cv.addEventListener("mousedown", this._dn); addEventListener("mouseup", this._up);
-    this.cv.addEventListener("touchmove", this._mv, {passive:true}); this.cv.addEventListener("touchstart", this._dn, {passive:false}); addEventListener("touchend", this._up);
-    this.mx = this.W/2; this.my = this.H*.7;
-  },
-  close(){
-    this.cv.style.display = "none"; removeEventListener("resize", this._res);
-    this.cv.removeEventListener("mousemove", this._mv); this.cv.removeEventListener("mousedown", this._dn); removeEventListener("mouseup", this._up);
-    this.cv.removeEventListener("touchmove", this._mv); this.cv.removeEventListener("touchstart", this._dn); removeEventListener("touchend", this._up);
-    this.stalkerOn = false; AU.heartbeat(0); MUSIC.stop();
-    if(this._kd){ removeEventListener("keydown", this._kd); removeEventListener("keyup", this._ku); this._kd = this._ku = null; }
-  },
-  fit(){ const dpr = Math.min(2, window.devicePixelRatio || 1); this.dpr = dpr; this.W = innerWidth; this.H = innerHeight;
-    this.cv.width = Math.floor(innerWidth*dpr); this.cv.height = Math.floor(innerHeight*dpr); this.c.setTransform(dpr,0,0,dpr,0,0); },
-  burst(x, y, color, n=12, sp=4, life=.6){ for(let i=0;i<n;i++){ const a = Math.random()*6.28, v = sp*(.4+Math.random()); this.parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,c:color,l:life,ml:life,r:2+Math.random()*3}); } },
-  pop(x, y, txt, color="#7dffb0", size=16){ this.texts.push({x,y,txt,c:color,l:.9,size}); },
-  flash(color="#fff", a=.35){ this.flashC = color; this.flashA = a; },
-  drawFx(dt){ const c = this.c, k = dt*60;
-    this.parts = this.parts.filter(p => (p.l -= dt) > 0);
-    for(const p of this.parts){ p.x += p.vx*k; p.y += p.vy*k; p.vy += .05*k; c.globalAlpha = p.l/p.ml; c.fillStyle = p.c; c.fillRect(p.x, p.y, p.r, p.r); } c.globalAlpha = 1;
-    this.texts = this.texts.filter(t => (t.l -= dt) > 0);
-    for(const t of this.texts){ t.y -= 40*dt; c.globalAlpha = Math.min(1, t.l*2); const sc = t.l > .8 ? 1 + (t.l-.8)*4 : 1;
-      c.font = `bold ${Math.round(t.size*sc)}px ui-monospace,Menlo,monospace`; c.textAlign = "center"; c.fillStyle = "#000"; c.fillText(t.txt, t.x+1, t.y+1); c.fillStyle = t.c; c.fillText(t.txt, t.x, t.y); }
-    c.globalAlpha = 1;
-    if(this.flashA > 0){ c.fillStyle = this.flashC; c.globalAlpha = this.flashA; c.fillRect(0,0,this.W,this.H); c.globalAlpha = 1; this.flashA = Math.max(0, this.flashA - dt*3); } },
-  hud(title, right, hp, sub){ const c = this.c, W = this.W;
-    c.fillStyle = "rgba(0,0,0,.55)"; c.fillRect(0,0,W,58); c.font = "bold 13px ui-monospace,Menlo,monospace"; c.textAlign = "left"; c.fillStyle = "#7dffb0";
-    let tt = title; while(tt.length > 8 && c.measureText(tt).width > W - 220) tt = tt.slice(0, -4) + "…"; c.fillText(tt, 18, 24);
-    const bw = Math.min(320, W*.4); this._hpGhost = this._hpGhost === undefined ? hp : this._hpGhost + (hp - this._hpGhost)*.04;
-    c.fillStyle = "#160a0d"; c.fillRect(18, 34, bw, 9); c.fillStyle = "rgba(255,45,85,.45)"; c.fillRect(18, 34, bw * Math.max(0,this._hpGhost)/100, 9);
-    c.fillStyle = hp < 35 ? (Math.floor(this.t*6)%2 ? "#ff2d55" : "#b0102f") : "#3ce68f"; c.fillRect(18, 34, bw * Math.max(0,hp)/100, 9);
-    c.textAlign = "right"; c.fillStyle = "#e7ffe9"; c.font = "bold 20px ui-monospace,Menlo,monospace"; c.fillText(right, W-18, 30);
-    if(sub){ c.font = "11px ui-monospace,Menlo,monospace"; c.fillStyle = "#7dffb0"; c.fillText(sub, W-18, 48); } },
-  quiet(raw){ if(!this.silence) return; this.silT += raw;
-    if(this.silHold > 0){ this.silHold -= raw; return; }
-    if(this.silT >= 1){ this.silT = 0; AU.tone(1400, "square", .001, .012, .02); }
-    if((this.silNext -= raw) <= 0){ this.silNext = 18 + Math.random()*20; this.silHold = 3 + Math.random()*3; if(Math.random() < .5) setTimeout(() => AU.creak(), (this.silHold*1000)|0); } },
-  /* it walks along the bottom toward your hand. if it reaches your hand, it takes a letter. */
-  stalk(raw){ if(!this.stalkerOn) return; const W = this.W, H = this.H, c = this.c;
-    if(!this.stalker) this.stalker = { x: Math.random() < .5 ? -40 : W+40, h: 40, gone: 0, t: 0 };
-    const k = this.stalker; k.t += raw; if(k.gone > 0){ k.gone -= raw; return; }
-    k.x += Math.sign(this.mx - k.x) * (14 + Math.min(30, k.t*.6)) * raw; k.h = Math.min(H*.42, k.h + raw*1.6);
-    if(Math.abs(this.mx - k.x) < 26 && this.my > H - k.h - 30){ k.gone = 40; k.x = Math.random() < .5 ? -40 : W+40; k.h = 40; this.hitstop = 2.6; taking("it reached your hand."); return; }
-    c.save(); c.filter = "blur(1.5px)"; c.globalAlpha = .88; c.fillStyle = "#000";
-    c.fillRect(k.x - k.h*.09, H - k.h, k.h*.18, k.h); c.beginPath(); c.ellipse(k.x, H - k.h - k.h*.08, k.h*.07, k.h*.09, 0, 0, 7); c.fill();
-    c.filter = "none"; if(Math.floor(k.t*3)%7 !== 0){ c.fillStyle = "rgba(232,224,210,.7)"; c.fillRect(k.x - k.h*.03, H - k.h - k.h*.09, 2, 1); c.fillRect(k.x + k.h*.02, H - k.h - k.h*.09, 2, 1); }
-    c.restore(); if(Math.random() < raw*.12) AU.knock(k.x < W/2 ? -.8 : .8, 1, true); },
-  impact(x, y, color="#ff2d55", big=false){ this.hitstop = big ? .14 : .07; this.shake = big ? 14 : 7; this.flash(color, big ? .4 : .22);
-    this.burst(x, y, color, big ? 26 : 14, big ? 7 : 5, .5); this.tear(big ? .2 : .1); if(big) AU.hit(); else { AU.thump(); AU.static(.12, .18); } },
-  run(update){
-    return new Promise(res => {
-      let last = performance.now(), done = null; this.hitstop = 0; this.slow = 1; this.blackout = 0; this.dreadT = 0; this.nextDread = 30 + Math.random()*20; this._idleSaid = false;
-      const frame = now => {
-        const raw = Math.min(.05, (now-last)/1000); last = now; let dt = raw * this.slow;
-        if(this.hitstop > 0){ this.hitstop -= raw; dt = 0; } this.t += dt;
-        const c = this.c; c.save();
-        if(this.shake > 0){ c.translate((Math.random()*2-1)*this.shake, (Math.random()*2-1)*this.shake); this.shake = Math.max(0, this.shake - raw*30); }
-        if(this.killed){ this.killed = false; c.restore(); return; }
-        if(!done && DEV.result !== null){ done = {done:true, win:DEV.result, t:0}; DEV.result = null; }
-        if(!done){ const r = update(dt, this.clicked); this.clicked = false; if(r && r.done){ done = r; done.t = 0; } }
-        else { done.t += raw; this.shake = Math.max(this.shake, (1.6-done.t)*3); }
-        this.drawFx(Math.max(dt, raw*.3)); if(!done) this.stalk(raw); if(!this.happy) this.vignette(); this.quiet(raw);
-        if(!done && (state.layer||0) >= 3){
-          if(DREAD.idle() > 9 && !this._idleSaid){ this._idleSaid = true; this.blackout = .7; this.hitstop = .7; this.blackText = pick(["you stopped moving", "keep your hand on the mouse", `${firstName().toLowerCase()}. move.`]); AU.duck(.8); AU.knock(.9, 2); }
-          if(DREAD.idle() < 2) this._idleSaid = false;
-          this.dreadT += raw; if(this.dreadT > this.nextDread){ this.dreadT = 0; this.nextDread = 45 + Math.random()*50;
-            this.blackout = .7; this.hitstop = .7; this.blackText = pick(DREAD.LINES()); this.blackFace = Math.random() < .5; AU.duck(1); AU.floorSwell(1.5); } }
-        if(this.blackout > 0){ this.blackout -= raw; c.fillStyle = "#000"; c.fillRect(0,0,this.W,this.H);
-          if(this.blackText){ c.fillStyle = "#ff2d55"; c.font = "bold 20px ui-monospace,Menlo,monospace"; c.textAlign = "center"; c.fillText(this.blackText, this.W/2, this.H/2); }
-          if(this.blackout <= 0){ if(this.blackFace) SCARE.presence(900); this.blackFace = false; } }
-        c.restore();
-        if(!done || done.t < 1.6) requestAnimationFrame(frame);
-        else { this.cv.style.opacity = "0"; setTimeout(() => res(done.win), 320); }
-      };
-      this.cv.style.opacity = "1"; requestAnimationFrame(frame);
-    });
-  },
-  vignette(){ const c = this.c, W = this.W, H = this.H;
-    if(!this._vg || this._vgW !== W || this._vgH !== H){ this._vg = c.createRadialGradient(W/2,H/2,H*.38,W/2,H/2,H*.95); this._vg.addColorStop(0,"rgba(0,0,0,0)"); this._vg.addColorStop(1,"rgba(0,0,0,.55)"); this._vgW = W; this._vgH = H; }
-    c.fillStyle = this._vg; c.fillRect(0,0,W,H); },
-  banner(txt, color="#ffcc4d", big=false){ this.pop(this.W/2, this.H*.32, txt, color, big ? 34 : 22); },
-  wave(st, dt, len, onWave){ st.wt = (st.wt||0) + dt;
-    if(st.wt >= len){ st.wt = 0; st.wave = (st.wave||1) + 1; this.banner(`WAVE ${st.wave}`, st.wave >= 8 ? "#ff2d55" : "#ffcc4d", true); this.tear(.12); AU.beep(st.wave >= 8 ? 110 : 660, .18); if(onWave) onWave(st.wave); }
-    return st.wave || 1; },
-  waveHud(st, goal){ return goal ? `WAVE ${st.wave||1}/${goal}` : `WAVE ${st.wave||1}`; },
-  arrow(color="#7dffb0"){ const c = this.c, x = this.mx, y = this.my; c.save(); c.shadowBlur = 6; c.shadowColor = "#000"; c.fillStyle = color; c.strokeStyle = "#000"; c.lineWidth = 1.2;
-    c.beginPath(); c.moveTo(x,y); c.lineTo(x+13,y+11); c.lineTo(x+6,y+11); c.lineTo(x+3,y+19); c.lineTo(x,y+18); c.closePath(); c.fill(); c.stroke(); c.restore(); },
-  post(level){
-    const c = this.c, W = this.cv.width, H = this.cv.height;
-    if(level <= 0 && this.tearT <= 0) return;
-    if(!this.off){ this.off = document.createElement("canvas"); this.oc = this.off.getContext("2d"); }
-    if(this.off.width !== W || this.off.height !== H){ this.off.width = W; this.off.height = H; }
-    this.oc.drawImage(this.cv, 0, 0); c.save(); c.setTransform(1,0,0,1,0,0);
-    if(level > .15 && Math.random() < level*.5){ c.globalAlpha = .28; c.drawImage(this.off, (Math.random()-.5)*level*22, 0); c.globalAlpha = 1; }
-    const tears = Math.floor(level*7 + (this.tearT > 0 ? 9 : 0));
-    for(let i=0;i<tears;i++){ const y = rnd(0,H-4), hh = rnd(2,Math.max(3, 40*level+8)); c.drawImage(this.off, 0, y, W, hh, rnd(-60,60)*(level+.4), y, W, hh); }
-    if(level > .3){ c.fillStyle = `rgba(255,45,85,${level*.12})`; for(let y=rnd(0,4); y<H; y+=rnd(6,14)) c.fillRect(0,y,W,1); }
-    c.restore(); if(this.tearT > 0) this.tearT -= .016;
-  },
-  tear(sec=.14){ this.tearT = sec; AU.static(.09, .14); }
-};
-const dist = (a,b,c,d) => Math.hypot(a-c, b-d);
-const glitchStr = (s, amt) => [...s].map(ch => Math.random() < amt ? pick(["▓","░","▒","█","¥","§"]) : ch).join("");
-
-/* ================================================================
    the people who came before
    ================================================================ */
 const VICTIMS = [
@@ -1749,235 +1664,6 @@ async function voice(lines, opts={}){
 }
 
 /* ================================================================
-   LAYER 1 — the dead support forum, then WITNESS
-   ================================================================ */
-function act2Login(){
-  state.act = 2; state.score = state.score || 0; DREAD.install(); SHADOW.on();
-  AU.hiss(true,.035); skin("forum"); tab("nimbus support board", "💬");
-  render(`<div class="wrap">
-    <div class="fhead"><div class="logo2">nimbus-support<small>UNOFFICIAL USER BOARD · EST. 2016 · NOT AFFILIATED</small></div>
-      <div class="userbox">Welcome back, <b>${esc(handle())}</b><br>Last visit: ${DREAD.hour()} · Unread: <b>1</b></div></div>
-    <div class="fnav"><span>Board index</span><span>FAQ</span><span>Members</span><span>Search</span><span style="margin-left:auto;color:#b31414">1 thread flagged for you</span></div>
-    <div class="fboard">
-    <div class="fbar">Billing » Nimbus — 4,102 topics · 31 pages</div>
-    <div class="fcrumb">Board index » Support » Billing » <b>Nimbus</b> — sorted by: last post</div>
-    <div class="frow" style="background:#eef1f7;font-weight:700;color:#3a4a6b;font-size:10px"><span></span><span>TOPIC</span><span class="rep">REPLIES</span><span class="views">VIEWS</span><span class="last">LAST POST</span></div>
-    ${VICTIMS.map((v,i) => `<div class="frow ${i%3===2?"locked":i%3===1?"hot":""}"><span class="ico"></span>
-      <span class="ttl"><b>${esc(v.n.toLowerCase().replace(/\W+/g,"_"))} — ${esc(v.w)}</b><small>by ${esc(v.n.split(" ")[0].toLowerCase())} · ${v.y}${i%3===2?" · LOCKED":""}</small></span>
-      <span class="rep">${rnd(0,40)}</span><span class="views">${rnd(200,9000).toLocaleString()}</span><span class="last">${esc(pick(["moderator","syslog","(deleted)","m_reyes","priya.r"]))} · ${v.y}</span></div>`).join("")}
-    <div class="frow mine"><span class="ico"></span>
-      <span class="ttl"><b>${esc(fullName())}</b><small>by ${esc(handle())} · posted 4 minutes ago · <span style="color:#b31414">you did not post this</span></small></span>
-      <span class="rep">0</span><span class="views">${rnd(1,4)}</span><span class="last">nobody · just now</span></div>
-    </div>
-    <div class="fstats">
-      <div><b>WHO IS ONLINE</b><span class="online">● syslog</span> · <span class="online dead">● moderator</span> · <span class="online dead">● (unknown)</span><br>registered users: 4,102 · online: 3 · hidden: 1</div>
-      <div><b>STATISTICS</b>Total posts 61,884 · Total topics 4,102<br>Newest member: <b style="color:#b31414">${esc(handle())}</b></div>
-    </div>
-    <p class="fnote" style="margin-top:16px;color:#175987;cursor:pointer" id="open">→ open your thread</p></div>`);
-  document.getElementById("open").onclick = () => layerOne();
-  document.querySelector(".frow.mine").onclick = () => layerOne();
-}
-
-async function layerOne(){
-  state.layer = 1;
-  let t = render(`<div class="wrap"><div class="fboard">
-    <div class="fbar">${esc(fullName())}</div><div class="fcrumb">Board index » Support » Billing » Nimbus</div>
-    <div style="padding:18px;font-size:13px;line-height:1.8">
-      <p><b>syslog</b> · registered 2021 · 1 post</p>
-      <p style="margin-top:12px">i'm not a daemon. i want that on the record before you trust me.</p>
-      <p style="margin-top:12px">i'm what's left of a session from 2021. aaron voss. he typed his name at a checkout exactly like you did, and when it finished with him there was enough log left over to keep writing. that's me.</p>
-      <p style="margin-top:12px">the moderator is coming for this board. it's coming right now, because you're reading it.</p>
-      <p style="margin-top:12px">click a thread while it's being deleted and it's archived. it can't delete the archive. hold for five waves. purple ones are bait.</p>
-      <p style="margin-top:18px"><button class="btn" id="ready" style="max-width:260px;background:#3a4a6b;color:#fff;animation:none">I'm ready</button></p>
-    </div></div></div>`);
-  await new Promise(res => document.getElementById("ready").onclick = res); if(!alive(t)) return;
-  const won = await playRound(witnessGame, "the board is gone");
-  if(!alive(t)) return;
-  if(!won) await taking("you lost the board. it took the first thing it could reach.");
-  await voice([
-    ["sys", won ? "held. that's more than i managed." : "it got the board. it's alright. it's alright."],
-    ["pause", 2600],
-    ["it", IT_LINES.polite, "eye"],
-    ["sys","don't answer it. it counts replies."],
-    ["do","you"],
-    ["sys","...that wasn't you. i know that wasn't you."],
-    ["it","IT WAS", "rewrite"],
-    ["do","eyeoff"]
-  ], {end:"snap"});
-  layerTwo(won);
-}
-
-function witnessGame(assist=0){
-  ARENA.open(); MUSIC.stop(); AU.stopAll(); ARENA.silence = true; ARENA.happy = false;
-  const A = ARENA, WIN_WAVE = 5, st = {wave:1, wt:0};
-  let hp = 100, saved = 0, secs = 0, combo = 0, activateT = 0, shuffleT = 0;
-  const TITLES = ["it charges after you cancel","the moderator is not a person","has anyone actually gotten out","it repeated my name back",
-    "there is a ledger — i found the ledger","do not type your real name at checkout","it asked me to hold","my printer is only printing names",
-    "door nine is the last one — i checked","the counter is not visitors. it is names","something green keeps typing to me",
-    "i can hear it in the fan","please someone answer this","syslog — aaron voss was here","does it know you are reading now",
-    "they removed the thread but i saved it","it says please hold every time i try to cancel"];
-  const threads = Array.from({length:11}, (_,i) => ({ title: TITLES[i % TITLES.length], rep: rnd(0,30), year: rnd(2016,2026), del:0, delSpeed:0, trap:false, savedT:0, flash:0, order:i, y:0 }));
-  const HUD_H = 58, HDR = 44, ROW_H = () => Math.min(48, (A.H - HUD_H - HDR - 30) / 11);
-  const diff = () => (1 + (st.wave-1) * .26) * (1 - assist*.12);
-  const retitle = td => { td.title = st.wave >= 3 && Math.random() < .3 ? pick([`${fullName().toLowerCase()} is reading this`, `${firstName().toLowerCase()}, don't look behind you`, `${handle()} posted 4 minutes ago`]) : pick(TITLES); td.rep = rnd(0,30); td.year = rnd(2016,2026); };
-  const mark = td => { if(td.del > 0 || td.savedT > 0) return; td.del = .001; td.trap = st.wave >= 2 && Math.random() < Math.min(.4, .16 + st.wave*.04); td.delSpeed = (.0055 + Math.random()*.003) * diff(); };
-  return A.run((dt, clicked) => {
-    const c = A.c, W = A.W, H = A.H, rh = ROW_H();
-    secs += dt; activateT += dt; shuffleT += dt;
-    A.wave(st, dt, 12, w => { if(w === 4) A.banner("THE MODERATOR IS ONLINE", "#ff5e7a"); if(w === WIN_WAVE) A.banner("HOLD THIS ONE AND YOU'RE THROUGH", "#7dffb0"); if(w === 7) A.banner("IT IS REORDERING THE BOARD", "#ff5e7a"); });
-    if(st.wave >= 7 && shuffleT > Math.max(2.5, 6 - st.wave*.3)){ shuffleT = 0; A.tear(.1); const idx = threads.map((_,i)=>i).sort(()=>Math.random()-.5); threads.forEach((t2,i) => t2.order = idx[i]); }
-    c.fillStyle = "#d9dfe8"; c.fillRect(0,0,W,H); c.fillStyle = "#c0c8d8"; c.fillRect(0,HUD_H,W,HDR);
-    c.fillStyle = "#3a5a9c"; c.font = "bold 14px Verdana,sans-serif"; c.textAlign = "left"; c.fillText("nimbus-support — unofficial", 16, HUD_H+22);
-    c.fillStyle = "#888fa8"; c.font = "11px Verdana"; c.fillText("Board Index » Billing » Nimbus  —  click a thread while the red bar is eating it", 16, HUD_H+38);
-    threads.forEach(td => { const ty = HUD_H+HDR + td.order*rh; td.y = td.y ? td.y + (ty - td.y)*Math.min(1, dt*8) : ty; });
-    threads.forEach(td => { const y = td.y;
-      c.fillStyle = td.savedT > 0 ? `rgba(180,255,200,${Math.min(1,td.savedT)})` : (td.order%2?"#eef0f6":"#e4e8f2"); c.fillRect(0,y,W,rh);
-      if(td.savedT > 0){ td.savedT -= dt*1.8; if(td.savedT <= 0){ td.savedT = 0; retitle(td); } }
-      if(td.flash > 0){ td.flash -= dt; c.fillStyle = `rgba(220,60,60,${td.flash*.4})`; c.fillRect(0,y,W,rh); }
-      if(td.del > 0){ c.fillStyle = td.trap ? "rgba(90,0,90,.45)" : "rgba(170,15,15,.42)"; c.fillRect(0,y,Math.min(W,W*td.del),rh);
-        if(td.trap){ c.fillStyle = "rgba(120,0,90,.9)"; c.font = "bold 10px Verdana"; c.textAlign = "right"; c.fillText("[MOD]",W-170,y+rh*.6); } }
-      c.fillStyle = td.del>0 ? "#cc4040" : "#6080bb"; c.fillRect(14,y+rh*.22,18,14);
-      c.fillStyle = td.del>0 ? (td.trap?"rgba(100,0,80,.75)":"rgba(130,15,15,.8)") : "#1a2f6a"; c.font = (td.del>0?"italic ":"")+"13px Verdana,sans-serif"; c.textAlign = "left";
-      c.fillText(td.title.slice(0, Math.floor((W-200)/8)), 38, y+rh*.64);
-      c.fillStyle = "#5a6a8a"; c.font = "11px Verdana"; c.textAlign = "right"; c.fillText(String(td.rep),W-110,y+rh*.64); c.fillText(String(td.year),W-30,y+rh*.64);
-      c.strokeStyle = "rgba(180,188,212,.6)"; c.lineWidth = .5; c.beginPath(); c.moveTo(0,y+rh); c.lineTo(W,y+rh); c.stroke();
-      if(td.del > 0){ td.del = Math.min(1, td.del + td.delSpeed*dt*60);
-        if(td.del >= 1){ if(!td.trap){ const dmg = 9 + st.wave - assist*2; hp = Math.max(0,hp-dmg); combo = 0; A.impact(W/2, y, "#b31414"); A.banner(`DELETED  −${dmg}`,"#ff5e7a"); }
-          td.del = 0; td.trap = false; td.flash = .8; retitle(td); } }
-      if(clicked && A.my>=y && A.my<y+rh && td.del>0 && td.savedT===0){
-        if(td.trap){ hp = Math.max(0,hp-20); combo = 0; A.impact(A.mx, A.my, "#ff2d55", true); A.banner("BAIT  −20","#ff5e7a"); td.del = 0; td.trap = false; td.flash = .9; }
-        else { saved++; combo++; state.score += Math.max(1,combo); AU.blip(Math.min(combo,14)); A.burst(A.mx,y+rh/2,"#ffcc4d",16,5,.6); td.del = 0; td.savedT = 1.4;
-          A.pop(A.mx,y+rh/2-22,`ARCHIVED  ×${combo}`,"#ffcc4d",15); if(combo%6===0){ hp = Math.min(100,hp+6); A.banner(`CHAIN ×${combo}  +6`,"#7dffb0"); AU.chord(); } } }
-    });
-    if(activateT > Math.max(.22, 1.9 / diff())){ activateT = 0; const free = () => threads.filter(t=>t.del===0&&t.savedT===0);
-      let n = 1 + Math.floor((st.wave-1)/2); while(n-- > 0 && free().length) mark(pick(free())); }
-    if(st.wave >= 6) hp -= dt*.4;
-    c.fillStyle = "#b4bcd4"; c.fillRect(0,H-26,W,26); c.fillStyle = "#3a5a9c"; c.fillRect(0,H-26,W*Math.min(1,(st.wt||0)/12),26);
-    c.fillStyle = "#fff"; c.font = "bold 11px Verdana"; c.textAlign = "center";
-    c.fillText(`${saved} archived · hold to wave ${WIN_WAVE} · next wave in ${Math.ceil(12-(st.wt||0))}s`, W/2, H-9);
-    if(st.wave > WIN_WAVE){ A.banner("THE BOARD HOLDS", "#7dffb0", true); AU.chord(); state.score += 15; return {done:true, win:true}; }
-    A.post(Math.max(0,(45-hp)/45)*.52);
-    A.hud("WITNESS — click threads while they are being deleted", A.waveHud(st, WIN_WAVE), hp, `${saved} archived  ·  ×${combo}`);
-    A.arrow(A.down ? "#ffcc4d" : "#1a2f6a");
-    if(hp<=0){ A.banner(`THE BOARD IS GONE — wave ${st.wave}`,"#ff2d55",true); AU.hit(); state.score += st.wave*3; return {done:true, win:false}; }
-  }).then(w => { ARENA.close(); return w; });
-}
-
-/* ================================================================
-   LAYER 2 — THE NAMES, a 1997 webring page, then ROT BREAKER
-   ================================================================ */
-async function layerTwo(won){
-  state.layer = 2; DREAD.install(); state.act = 2; SHADOW.on();
-  skin("retro"); tab("THE NAMES — a webring page", "🕸️");
-  let t = render(`<div class="wrap r97"><div class="rbar"></div>
-    <div class="retrobox">
-      <div class="badges"><span class="badge2 n">NEW!</span><span class="badge2 uc">🚧 UNDER CONSTRUCTION 🚧</span><span class="badge2">BEST VIEWED 800×600</span><span class="badge2 n">NEW!</span></div>
-      <h1>☆ THE NAMES ☆</h1>
-      <p class="blinky">*** LAST UPDATED 04/12/1997 *** SITE BY syslog ***</p>
-      <div class="marq"><span>${won ? "you held the board. two people before you managed that." : "it got the board. keep moving."} · this page is a ledger · do not give it the name twice · sign the guestbook · </span></div>
-      <p style="font-size:13px;line-height:1.9">i keep this page because it can't delete 1997.<br>the counter is not visitors.</p>
-      <div class="counter" id="cnt">004102</div>
-      <table><tr><td class="h">NAME</td><td class="h">YEAR</td><td class="h">HELD</td><td class="h">STATUS</td></tr>
-        ${VICTIMS.map(v => `<tr><td>${esc(v.n)}</td><td>${v.y}</td><td>${v.s}s</td><td style="color:#f44">kept</td></tr>`).join("")}
-        <tr><td style="color:#ff0">${esc(fullName())}</td><td>2026</td><td>—</td><td style="color:#ff0">reading</td></tr></table>
-      <div class="guest"><b>GUESTBOOK</b>
-        <div><b>marisol</b> <i>03/19/2019</i> — it said please hold. does anyone know what that means</div>
-        <div><b>aaron_v</b> <i>11/02/2021</i> — i can still type. i think i can still type</div>
-        <div><b>k.lindqvist</b> <i>05/30/2025</i> — 52 seconds. beat that.</div>
-        <div><b style="color:#ff0">${esc(handle())}</b> <i>${new Date().toLocaleDateString()}</i> — <span id="sig" style="color:#666">(signing…)</span></div></div>
-      <div class="midi"><i></i>now playing: the_names.mid (loop)</div>
-      <div class="webring">[ &lt;&lt; PREV ] [ RANDOM ] [ LIST ] [ NEXT &gt;&gt; ]</div>
-    </div><div class="rbar"></div></div>`);
-  const cnt = document.getElementById("cnt");
-  const bump = setInterval(() => { if(!alive(t)) return clearInterval(bump); cnt.textContent = String(+cnt.textContent + 1).padStart(6,"0"); AU.tick(); }, 2200);
-  await sleep(6500); clearInterval(bump); if(!alive(t)) return;
-  cnt.textContent = "004103"; cnt.style.color = "#fff"; AU.thump();
-  const sig = document.getElementById("sig"); const line = `i was here. i am still here. — ${fullName().toLowerCase()}`;
-  sig.style.color = "#ff4dff"; for(let i=0;i<=line.length;i++){ if(!alive(t)) return; sig.textContent = line.slice(0,i); AU.click(); await sleep(70); }
-  await sleep(1600); if(!alive(t)) return;
-  await voice([
-    ["sys","that counter tick was you. and you didn't sign that. i watched. your hands were on the mouse."],
-    ["it", IT_LINES.ledger, "face"],
-    ["pause", 1800],
-    ["sys","it's rotting the page to get at your line. 1997 had one weapon. you'll recognise it. burn 40 bricks before the rot reaches your paddle."]
-  ]);
-  if(!alive(t)) return;
-  const w2 = await playRound(breakerGame, "the rot reached you");
-  if(!alive(t)) return;
-  if(!w2) await taking("you lost the page. it took the first thing it could reach.");
-  await voice(w2 ? [["sys","the page is a mess but it's still 1997 in there."],["it", IT_LINES.patient]]
-                 : [["sys","it got the page. it knows how you move now."],["it", IT_LINES.seen]]);
-  if(!alive(t)) return;
-  await voice([["it","THERE IS A PAGE IN THE GUESTBOOK BEFORE YOURS. IT IS IN YOUR HANDWRITING."],["sys","that's not possible. the book only goes forward."],
-    ["pause", 2400],["sys","...it goes forward. it only goes forward."],["it", DREAD.line()],["sys", DREAD.fact()],["do","cut"],["sys","keep moving. please."]], {lead:400});
-  layerThree(w2);
-}
-
-function breakerGame(assist=0){
-  ARENA.open(); ARENA.silence = false; ARENA.happy = true; MUSIC.play(TRACKS.happy);
-  const A = ARENA, GOAL = 40, st = {wave:1, wt:0};
-  let hp = 100, secs = 0, lives = 3 + (assist ? 1 : 0), cleared = 0, combo = 0, descendT = 0, padW = 120 + assist*15, wideT = 0, bossed = false;
-  const NAME = fullName().toUpperCase().replace(/\s/g,""), COLS = 12, bricks = [], balls = [], drops = [], bw = () => A.W/COLS, bh = 26;
-  const addRow = (row, core) => { for(let i=0;i<COLS;i++) if(Math.random()<.85) bricks.push({cx:i, r:row, hp: (core && Math.random()<.2) ? 2 : 1, wob:Math.random()*6}); };
-  for(let r=0;r<5;r++) addRow(r, r<2);
-  const newBall = () => balls.push({x:A.W/2, y:A.H*.7, vx:0, vy:0, stuck:true}); newBall();
-  const words = VICTIMS.map(v => v.n.split(" ")[0].replace(/[()]/g,"")).concat([firstName()]);
-  const stars = Array.from({length:120}, () => ({x:Math.random(), y:Math.random(), s:Math.random()*2.2+.6, t:Math.random()*6.3}));
-  return A.run((dt, clicked) => {
-    const c = A.c, W = A.W, H = A.H; secs += dt; descendT += dt; if(wideT > 0) wideT -= dt;
-    A.wave(st, dt, 14, w => { if(w === 3) A.banner("THE WALL IS FASTER", "#ff5e7a"); if(w === 5){ padW = Math.max(90, padW - 24); A.banner("YOUR PADDLE SHRANK", "#ff5e7a"); } });
-    c.fillStyle = "#000022"; c.fillRect(0,0,W,H);
-    stars.forEach(s => { s.t += dt*2.4; c.fillStyle = `rgba(255,255,255,${.45+Math.sin(s.t)*.4})`; c.fillRect(s.x*W, s.y*H, s.s, s.s); });
-    ["#ff0000","#ff8800","#ffff00","#00ff00","#0000ff","#8800ff"].forEach((col,i) => { c.fillStyle = col; c.fillRect(0,58+i*4,W,4); });
-    if(descendT > Math.max(2.4, 7.5 - st.wave*.6) + assist*1.5){ descendT = 0; bricks.forEach(b => b.r++); addRow(0, true); AU.beep(140,.2); A.shake = 4; A.tear(.12); }
-    if(cleared >= 20 && !bossed){ bossed = true; A.banner("IT PUT YOUR NAME IN", "#ff2d55"); A.tear(.2); bricks.forEach(b => b.r++);
-      for(let i=0;i<COLS;i++) bricks.push({cx:i, r:0, hp:2, wob:i, boss:true, ch:NAME[i % NAME.length] || "?"}); }
-    balls.forEach(b => { if(!b.stuck){ const spd = Math.hypot(b.vx,b.vy), want = 360 + st.wave*35; if(spd < want){ b.vx *= want/spd; b.vy *= want/spd; } } });
-    const pw = wideT > 0 ? padW*1.7 : padW, px = Math.max(pw/2, Math.min(W-pw/2, A.mx)), py = H-46;
-    c.fillStyle = "#b8c0d8"; c.fillRect(px-pw/2, py-8, pw, 16); c.fillStyle = "#d0d8ea"; c.fillRect(px-pw/2+2, py-6, pw-4, 12);
-    c.fillStyle = "#3a5a9c"; c.font = "9px Verdana"; c.textAlign = "center"; c.fillText("▐ SCROLL ▌", px, py+3);
-    for(let i=balls.length-1;i>=0;i--){ const b = balls[i];
-      if(b.stuck){ b.x = px; b.y = py-16; if(clicked || A.down){ b.stuck = false; b.vx = (Math.random()-.5)*300; b.vy = -330; } }
-      else { b.x += b.vx*dt; b.y += b.vy*dt;
-        if(b.x < 8 || b.x > W-8){ b.vx *= -1; b.x = Math.max(8, Math.min(W-8, b.x)); AU.tick(); }
-        if(b.y < 64){ b.vy = Math.abs(b.vy); b.y = 64; AU.tick(); }
-        if(b.y > py-14 && b.y < py+8 && Math.abs(b.x-px) < pw/2+6 && b.vy > 0){ b.vy = -Math.abs(b.vy); b.vx = (b.x-px)/(pw/2)*380; AU.tone(520,"square",.002,.06,.05); combo = 0; }
-        if(b.y > H+20){ balls.splice(i,1); if(!balls.length){ lives--; hp -= 25; A.impact(b.x, H-30, "#ff2d55", true); A.banner(lives > 0 ? `${lives} LEFT` : "OUT", "#ff2d55"); if(lives > 0) newBall(); } continue; } }
-      c.save(); c.translate(b.x, b.y); c.rotate(secs*8); c.fillStyle = "#ffff88"; c.font = "bold 16px Georgia"; c.textAlign = "center"; c.fillText("✦", 0, 6); c.restore(); }
-    for(let i=bricks.length-1;i>=0;i--){ const b = bricks[i]; b.wob += dt*2;
-      const x = b.cx*bw()+3, y = 70 + b.r*(bh+4), w = bw()-6;
-      c.fillStyle = b.boss ? "#4a0010" : b.hp > 1 ? "#cc5500" : "#aa0020"; c.fillRect(x,y,w,bh);
-      c.strokeStyle = b.boss ? "#ff2060" : b.hp > 1 ? "#ffcc00" : "#ff6060"; c.lineWidth = 2; c.strokeRect(x+1,y+1,w-2,bh-2);
-      c.fillStyle = b.boss ? "#ffaacc" : b.hp > 1 ? "#ffee88" : "#ffbbbb"; c.textAlign = "center";
-      c.font = b.boss ? "bold 13px 'Courier New',monospace" : `${Math.min(11, Math.round(w*.17))}px 'Courier New',monospace`;
-      c.fillText(b.boss ? b.ch : words[(b.cx + b.r) % words.length], x+w/2, y+bh/2+(b.boss?5:3));
-      if(y + bh > py-10){ A.banner(`THE ROT REACHED YOU`, "#ff2d55", true); AU.hit(); return {done:true, win:false}; }
-      for(const ball of balls){ if(ball.stuck) continue;
-        if(ball.x > x-6 && ball.x < x+w+6 && ball.y > y-6 && ball.y < y+bh+6){
-          const fromSide = Math.min(Math.abs(ball.x-x), Math.abs(ball.x-x-w)) < Math.min(Math.abs(ball.y-y), Math.abs(ball.y-y-bh));
-          if(fromSide) ball.vx *= -1; else ball.vy *= -1;
-          b.hp--; A.burst(ball.x, ball.y, b.hp > 0 ? "#ffcc4d" : "#ff5e7a", 8, 4, .4);
-          if(b.hp <= 0){ bricks.splice(i,1); cleared++; combo++; state.score += 1; AU.blip(Math.min(combo,14)); A.pop(x+w/2, y, "×"+combo, "#39ff5e", 13);
-            if(combo % 6 === 0){ hp = Math.min(100, hp+5); A.banner(`×${combo}  +5`, "#7dffb0"); AU.chord(); }
-            if(Math.random() < .12 + assist*.04) drops.push({x:x+w/2, y:y+bh, kind: Math.random()<.5 ? "wide" : "ball"}); }
-          else AU.beep(260,.04);
-          break; } } }
-    for(let i=drops.length-1;i>=0;i--){ const d = drops[i]; d.y += 120*dt;
-      c.fillStyle = Math.floor(secs*4)%2===0 ? "#ffff00" : "#ff8800"; c.fillRect(d.x-20, d.y-10, 40, 20); c.fillStyle = "#000"; c.font = "bold 9px Verdana"; c.textAlign = "center";
-      c.fillText(d.kind === "wide" ? "WIDE!" : "+BALL!", d.x, d.y+4);
-      if(d.y > py-12 && d.y < py+12 && Math.abs(d.x-px) < pw/2+14){ drops.splice(i,1); AU.chord();
-        if(d.kind === "wide"){ wideT = 9; A.banner("syslog: WIDER", "#7dffb0"); } else { newBall(); const nb = balls[balls.length-1]; nb.stuck = false; nb.y = py-30; nb.vx = (Math.random()-.5)*300; nb.vy = -360; A.banner("syslog: +1 BALL", "#7dffb0"); } }
-      else if(d.y > H) drops.splice(i,1); }
-    if(!bricks.length){ for(let r=0;r<4;r++) addRow(r, true); A.banner("THE PAGE REGROWS", "#ffcc4d"); }
-    if(balls.some(b => b.stuck) && secs < 20){ c.font = "bold 14px monospace"; c.textAlign = "center"; c.fillStyle = Math.sin(secs*6)>0 ? "#39ff5e" : "#0f4a1c"; c.fillText("MOVE MOUSE · CLICK TO LAUNCH", W/2, H*.6); }
-    A.post(Math.max(0,(40-hp)/40)*.5);
-    A.hud("ROT BREAKER — 1997", `${cleared}/${GOAL}`, hp, `${"●".repeat(Math.max(0,lives))}${"○".repeat(Math.max(0,3-lives))}`);
-    if(cleared >= GOAL){ A.banner("THE PAGE HOLDS", "#7dffb0", true); AU.chord(); state.score += 10; return {done:true, win:true}; }
-    if(lives <= 0 || hp <= 0){ A.banner(`LOST THE PAGE`, "#ff2d55", true); AU.hit(); return {done:true, win:false}; }
-  }).then(w => { ARENA.close(); return w; });
-}
-
-/* ================================================================
    THE RETURNS — back on the sign-in page. one thing is different each time.
    ================================================================ */
 async function returnHome(n){
@@ -2021,115 +1707,6 @@ async function returnHome(n){
     setTimeout(() => { if(alive(t)) document.title = `goodnight, ${F.toLowerCase()}`; }, 15000); }
 }
 
-/* ================================================================
-   LAYER 3 — index of doors, then the hallway (stealth)
-   ================================================================ */
-async function layerThree(won){
-  state.layer = 3; DREAD.install(); state.act = 2; SHADOW.on();
-  await returnHome(1);
-  skin("onion"); tab("index of doors", "🚪");
-  let t = render(`<div class="wrap"><pre class="ohead">   ___  ___   ___  ___  ___
-  |   \\/   | |   \\/   \\/   |   index of doors
-  | |\\  /| | | |\\   /|\\   |   twenty-four
-  |_| \\/ |_| |_| \\_/ |_\\__|   most are occupied</pre>
-  <div class="odoors">
-    ${VICTIMS.map((v,i) => `<div class="door dead"><span>door_${String(i+1).padStart(2,"0")}</span><span>occupied — ${esc(v.n)}, ${v.y}</span><span>${v.s}s</span></div>`).join("")}
-    <div class="door" id="go14"><span>door_24</span><span>empty</span><span>open</span></div>
-  </div>
-  <p style="margin-top:22px;font-size:12px;color:#3fbf5f">syslog: door 24 is a hallway on a machine older than you. they come out of the other doors. they carry their own light.</p>
-  <p style="font-size:12px;color:#3fbf5f">syslog: click to walk. the light is the only thing that can see you. stand still if it finds you — it sees movement better than shapes. five doors and you're through.</p></div>`);
-  await new Promise(res => { const g = document.getElementById("go14"); if(g) g.onclick = res; else setTimeout(res, 4000); });
-  if(!alive(t)) return;
-  await voice([
-    ["sys","it's an old machine. eighty columns. the hallway has been running on it since before i got here."],
-    ["sys","they walk their routes. they've walked them for years. they aren't looking for you. they don't have to look."],
-    ["do","room"],
-    ["it","THE SMILING ONES ARE MINE. THEY WERE PEOPLE. I KEPT THE FACE.", "eye"],
-    ["sys","...don't look at the faces. look at the light. if you're moving in it, you're already on the list."],
-    ["it", DREAD.line(), "eye"], ["do","eyeoff"]
-  ]);
-  if(!alive(t)) return;
-  const w3 = await playRound(navigateGame, "they found you in the hall");
-  if(!alive(t)) return;
-  if(!w3) await taking("it caught you in the hall. it keeps what it catches.");
-  await voice(w3 ? [["sys","you made it down the hall. i've watched twenty-three people try that."],["it", IT_LINES.close, "face"],["pause",2200],["it", IT_LINES.own]]
-                 : [["it","THEY HAVE YOUR ROUTE NOW. THEY WILL WALK IT.", "room"],["sys","it's alright. everyone gets caught in the hall."],["pause",1800],["it", IT_LINES.own]], {end:"snap"});
-  layerFour(w3);
-}
-
-function navigateGame(assist=0){
-  ARENA.stalkerOn = assist < 2; ARENA.silence = false; ARENA.happy = false; ARENA.open(); MUSIC.play(TRACKS.dos);
-  const A = ARENA, WIN_STAGE = 5, NAMES = ["ENTRY","AARON VOSS","D. PEARL","MARISOL REYES","PRIYA RAMAN","K. LINDQVIST","THE EXIT"];
-  let stage = 0, hp = 100, secs = 0, lives = 3 + (assist ? 1 : 0), detection = 0, stageT = 0, px, py, ptx, pty, ents = [], blink = 0, panic = 0;
-  const S = () => ({ n: 1 + Math.floor(stage/2), fov: Math.min(110, 66 + stage*6 - assist*6), range: Math.min(.34, .21 + stage*.02 - assist*.015), speed: Math.min(.3, .13 + stage*.025 - assist*.015) });
-  const initStage = () => { px = .10; py = .5; ptx = px; pty = py; detection = 0; stageT = 0; const cfg = S(); ents = [];
-    const routes = [[[.34,.22],[.34,.78]], [[.55,.78],[.55,.22]], [[.72,.30],[.40,.70]], [[.25,.5],[.78,.5]], [[.62,.18],[.62,.82]]];
-    for(let i=0;i<cfg.n;i++){ const r = routes[(i + stage) % routes.length]; ents.push({x:r[0][0], y:r[0][1], ang:0, i:0, wait:0, route:r, ...cfg, blink: stage >= 4}); } };
-  initStage();
-  const COLS = 80, CGA = { dg:"#555", lg:"#aaa", wh:"#fff", yl:"#ff5", lr:"#f55", lgn:"#5f5" };
-  return A.run((dt, clicked) => {
-    const c = A.c, W = A.W, H = A.H, sx = x => x*W, sy = y => y*H; secs += dt; stageT += dt; blink += dt;
-    const cw = W/COLS, ch = cw*2, ROWS = Math.floor((H-58)/ch), oy = 58 + ((H-58) - ROWS*ch)/2;
-    const FONT = `${Math.floor(ch*.9)}px "Lucida Console","Courier New",monospace`;
-    const cell = (col,row,chr,color) => { c.fillStyle = color; c.fillText(chr, col*cw + cw/2, oy + row*ch + ch*.75); };
-    c.fillStyle = "#000"; c.fillRect(0,0,W,H); c.font = FONT; c.textAlign = "center";
-    const wallTop = Math.floor(ROWS*.10), wallBot = Math.floor(ROWS*.90);
-    if(!A._dos || A._dos.W !== W || A._dos.H !== H){
-      const fc = document.createElement("canvas"); fc.width = Math.floor(W*A.dpr); fc.height = Math.floor(H*A.dpr); const f = fc.getContext("2d"); f.setTransform(A.dpr,0,0,A.dpr,0,0); f.font = FONT; f.textAlign = "center";
-      const fcell = (col,row,chr,color) => { f.fillStyle = color; f.fillText(chr, col*cw + cw/2, oy + row*ch + ch*.75); };
-      for(let r=0;r<ROWS;r++) for(let k=0;k<COLS;k++){ if(r < wallTop || r > wallBot) fcell(k,r, (r===wallTop-1||r===wallBot+1) ? "▓" : "▒", r===wallTop-1||r===wallBot+1 ? CGA.lg : "#222"); else if(((k*7+r*13)%11)===0) fcell(k,r,"·",CGA.dg); }
-      for(let i=0;i<8;i++){ const dc = Math.floor(COLS*(.08+i*.115)); fcell(dc,wallTop-1,"╫",CGA.lg); fcell(dc+1,wallTop-1,"╫",CGA.lg); }
-      A._dos = {cv:fc, W, H}; }
-    c.drawImage(A._dos.cv, 0, 0, W, H);
-    c.textAlign = "left"; c.fillStyle = CGA.lg; const prompt = `C:\\DOORS\\24>  ${NAMES[Math.min(stage,6)].toLowerCase().replace(/\s/g,"_")}.exe   door ${stage+1}/${WIN_STAGE}   lives ${lives}`;
-    c.fillText(prompt + (Math.floor(blink*2)%2 ? "_" : ""), cw, oy + (ROWS-1)*ch + ch*.75); c.textAlign = "center";
-    const toCell = (x,y) => [Math.round(x/cw), Math.round((y-oy)/ch)];
-    const ex = sx(.90), ey = sy(.5);
-    { const [ec,er] = toCell(ex,ey); for(let r=-2;r<=2;r++){ cell(ec-1,er+r,"║",CGA.lgn); cell(ec+1,er+r,"║",CGA.lgn); } cell(ec,er,"⌂",Math.floor(blink*3)%2?CGA.lgn:CGA.wh); }
-    let maxCone = 0;
-    ents.forEach(en => {
-      const tgt = en.route[en.i], dx = tgt[0]-en.x, dy = tgt[1]-en.y, d = Math.hypot(dx,dy);
-      if(d < .012){ en.wait += dt; if(en.wait > .6){ en.i = (en.i+1) % en.route.length; en.wait = 0; } en.ang += dt*(stage>=3 ? 1.2 : .5); }
-      else { en.x += dx/d*en.speed*dt; en.y += dy/d*en.speed*dt; const want = Math.atan2(dy*H, dx*W); let dd = want - en.ang; while(dd > Math.PI) dd -= 6.283; while(dd < -Math.PI) dd += 6.283; en.ang += dd*Math.min(1, dt*6); }
-      const exs = sx(en.x), eys = sy(en.y), r = en.range*W, hf = en.fov*Math.PI/360, visible = !en.blink || Math.sin(secs*2 + en.x*9) > -.3;
-      if(visible){ const [ecol, erow] = toCell(exs,eys), rc = Math.ceil(r/cw);
-        for(let rr=Math.max(wallTop,erow-Math.ceil(rc/2)); rr<=Math.min(wallBot,erow+Math.ceil(rc/2)); rr++) for(let cc=Math.max(0,ecol-rc); cc<=Math.min(COLS-1,ecol+rc); cc++){
-          const ddx = (cc-ecol)*cw, ddy = (rr-erow)*ch, dd = Math.hypot(ddx,ddy); if(dd > r || dd < cw) continue;
-          let da = Math.atan2(ddy,ddx) - en.ang; while(da > Math.PI) da -= 6.283; while(da < -Math.PI) da += 6.283;
-          if(Math.abs(da) < hf){ const near = 1 - dd/r; cell(cc,rr, near > .55 ? "▒" : "░", detection > .4 ? CGA.lr : (near > .55 ? CGA.lg : CGA.dg)); } }
-        const pdx = A.pxs - exs, pdy = A.pys - eys, pd = Math.hypot(pdx,pdy);
-        if(pd < r){ let da = Math.atan2(pdy,pdx) - en.ang; while(da > Math.PI) da -= 6.283; while(da < -Math.PI) da += 6.283;
-          if(Math.abs(da) < hf) maxCone = Math.max(maxCone, (1 - pd/r) * (1 - Math.abs(da)/hf) + .35); } }
-      const [ecol, erow] = toCell(exs,eys); c.globalAlpha = visible ? 1 : .2; cell(ecol, erow, detection > .6 ? "☻" : "☺", detection > .4 ? CGA.lr : CGA.wh); c.globalAlpha = 1;
-    });
-    if(clicked && A.my > 58){ ptx = A.mx/W; pty = A.my/H; AU.pcbeep(1200, .03); }
-    const pdx = ptx-px, pdy = pty-py, pd = Math.hypot(pdx,pdy), moving = pd > .006;
-    // standing still in the light: it sees you much more slowly. that is the whole trick.
-    detection = Math.max(0, Math.min(1, detection + (maxCone > 0 ? maxCone*2.2*(moving ? 1 : .3) : -1.3)*dt));
-    if(stageT > 3 && Math.random() < dt*.06 && detection < .2){ A._behind = .08; AU.tick(); }
-    if(A._behind > 0){ A._behind -= dt; const [pc2,pr2] = toCell(A.pxs,A.pys); cell(pc2 + (Math.random()<.5?-1:1), pr2, "☻", CGA.wh); }
-    if(moving){ const spd = .30 - detection*.10; px += pdx/pd*spd*dt; py += pdy/pd*spd*dt; }
-    py = Math.max(.14, Math.min(.86, py)); A.pxs = sx(px); A.pys = sy(py);
-    if(moving){ const [tc,tr] = toCell(sx(ptx),sy(pty)); cell(tc,tr,"×",CGA.dg); }
-    const [pc,pr] = toCell(A.pxs,A.pys); cell(pc,pr,"@", detection > .4 ? CGA.yl : CGA.lgn);
-    if(detection > 0){ const n = Math.round(detection*20); c.textAlign = "left"; c.fillStyle = detection > .6 ? CGA.lr : CGA.yl; c.fillText("SEEN [" + "█".repeat(n) + "░".repeat(20-n) + "]", W - cw*30, oy + ch*.75); c.textAlign = "center"; }
-    panic = Math.max(0, panic - dt*2);
-    if(detection > .85 || panic > 0){ const n = Math.floor((detection > .85 ? detection : panic) * 60); for(let i=0;i<n;i++) cell(rnd(0,COLS-1), rnd(0,ROWS-2), "☻", Math.random()<.5 ? CGA.lr : CGA.wh); }
-    c.fillStyle = "rgba(0,0,0,.35)"; for(let y=58; y<H; y+=3) c.fillRect(0,y,W,1);
-    AU.heartbeat(62 + detection*100);
-    if(detection >= 1){ lives--; detection = 0; panic = 1; hp = Math.max(0, hp-24); A.impact(A.pxs, A.pys, "#ff2d55", true); AU.shriek();
-      A.banner(lives > 0 ? `SEEN  ·  ${lives} left` : "IT HAS YOU", "#ff2d55", lives <= 0); px = .10; py = .5; ptx = px; pty = py; ents.forEach(en => { en.x = en.route[0][0]; en.y = en.route[0][1]; en.i = 0; }); }
-    if(Math.abs(px-.90) < .05 && Math.abs(py-.5) < .09){ stage++; state.score += 10; A.burst(ex,ey,"#7dffb0",24,7,.85); [880,1175,1760].forEach((f,i) => setTimeout(() => AU.pcbeep(f,.07), i*80));
-      if(stage >= WIN_STAGE){ A.banner("THE HALL IS BEHIND YOU", "#7dffb0", true); return {done:true, win:true}; }
-      A.banner(NAMES[stage], "#ffcc4d", true); if(stage % 2 === 0) lives = Math.min(4, lives+1); MUSIC.setTempo(Math.min(150, 96 + stage*8)); initStage(); }
-    if(stageT > 40){ hp -= dt*4; if(Math.floor(stageT*10) % 50 === 0) A.banner("IT IS GETTING CLOSER", "#ff5e7a"); }
-    A.post(Math.max(0,(40-hp)/40)*.35 + detection*.3);
-    A.hud("THE HALL — click to walk · stand still in the ░ · reach the ⌂", `DOOR ${stage+1}/${WIN_STAGE}`, hp, `${lives} lives`);
-    A.arrow(detection > .4 ? "#ff8a8a" : "#7dffb0");
-    if(hp <= 0 || lives <= 0){ A.banner(`CAUGHT — door ${stage+1}`, "#ff2d55", true); AU.hit(); return {done:true, win:false}; }
-  }).then(w => { ARENA.close(); return w; });
-}
-
 /* the hallway light goes out. nothing happens. that is the scene. */
 async function theLongDark(){
   const t = render(""); skin("deep"); document.body.style.background = "#000"; tab("", "⬛");
@@ -2150,321 +1727,574 @@ async function theLongDark(){
   await nap(2600); box.remove(); SKIP.hide();
 }
 
+
 /* ================================================================
-   LAYER 4 — THE NAME (dodge it)
+   ACT TWO — the haunted website.
+   Every layer is a broken web page with its own Terms of Service:
+   three rules, always visible. The page tries to make you break them.
+   Each broken rule costs one letter of your name. Nothing else does.
    ================================================================ */
-async function layerFour(won){
-  state.layer = 4; DREAD.install(); state.act = 2; SHADOW.on();
-  await theLongDark();
-  skin("deep"); tab("nimbus.cloud", "🩸"); AU.drone(true);
-  let t = render(`<div class="wrap decay">
-    <div class="logo" style="color:#7d0f18">NIMBUS</div><p class="sub center">Cloud storage that keeps up with you</p>
-    <div class="card login">
-      <h2 class="center" style="font-size:19px;color:#c81f2b">Welcome back, ${esc(firstName())}</h2>
-      <p class="tiny center" style="margin-top:14px">syslog: ${Math.round(state.score)} points of held ground. ${won ? "lindqvist never saw the last door." : "lindqvist had fifty-two."}</p>
-      <p class="tiny center">syslog: i need to tell you what the doors were for. it wasn't chasing you. it was timing you.</p>
-      <p class="tiny center">syslog: it's been sending your name to a phone, one letter at a time, so it can hear how it sounds. now it's sending the letters at you.</p>
-      <p class="tiny center" style="color:#c81f2b">syslog: survive 40 seconds. don't let a single letter touch you. graze them if you're brave — it's worth points.</p>
-      <button class="btn" id="last" style="margin-top:22px">Hold the door</button>
-    </div></div>`);
-  await new Promise(res => document.getElementById("last").onclick = res); if(!alive(t)) return;
-  const w4 = await playRound(nameGame, "your name touched you");
-  if(!alive(t)) return;
-  if(!w4) await taking("it said your name close enough to keep some of it.");
+const ACT2CSS = `
+html.devmode .objective, html.devmode #namebar{ top:calc(52px + env(safe-area-inset-top,0px)) !important }
+#namebar{ position:fixed; top:calc(10px + env(safe-area-inset-top,0px)); right:calc(12px + env(safe-area-inset-right,0px)); z-index:9990; display:none;
+  font-family:var(--mono); font-size:12px; background:rgba(0,0,0,.82); color:#cfc6c0; border:1px solid #3a1015; padding:7px 11px; letter-spacing:.06em; pointer-events:none }
+#namebar b{ color:#fff; font-weight:600; letter-spacing:.18em } #namebar b i{ color:#ff2d55; font-style:normal; text-decoration:underline }
+#rulesbtn{ position:fixed; left:calc(12px + env(safe-area-inset-left,0px)); bottom:calc(14px + env(safe-area-inset-bottom,0px)); z-index:9990; display:none;
+  font-family:var(--mono); font-size:12px; background:#0d0607; color:#ffd2d8; border:1px solid #ff2d55; padding:10px 14px; cursor:pointer; letter-spacing:.08em; min-height:44px }
+#rulespanel{ position:fixed; inset:0; z-index:9993; display:none; background:rgba(0,0,0,.86); align-items:center; justify-content:center; padding:20px }
+#rulespanel .tos{ width:min(560px,100%); max-height:88vh; overflow:auto; background:#f4f1ea; color:#1a1414; font-family:Georgia,"Times New Roman",serif; padding:26px 28px; box-shadow:0 20px 60px rgba(0,0,0,.6) }
+#rulespanel h3{ font-family:var(--mono); font-size:12px; letter-spacing:.2em; color:#7d0f18 } #rulespanel h4{ font-size:22px; margin:6px 0 4px }
+#rulespanel .goal{ font-family:var(--mono); font-size:12px; background:#1a1414; color:#e9e2d8; padding:10px 12px; margin:14px 0; line-height:1.6 }
+#rulespanel ol{ margin:10px 0 0 22px; font-size:16px; line-height:1.55 } #rulespanel li{ margin-bottom:10px } #rulespanel li.broke{ color:#a0101c; text-decoration:line-through }
+#rulespanel .fine{ font-size:11px; color:#6a5e58; margin-top:10px; font-family:var(--mono) }
+#rulespanel button{ margin-top:16px; width:100%; font-family:var(--mono); font-size:14px; letter-spacing:.14em; background:#1a1414; color:#fff; border:0; padding:14px; cursor:pointer }
+#brokenbar{ position:fixed; left:0; right:0; top:38%; z-index:9994; display:none; text-align:center; background:#000; color:#ff2d55; padding:22px 16px;
+  font-family:var(--mono); font-size:clamp(16px,3vw,26px); letter-spacing:.12em; border-top:2px solid #ff2d55; border-bottom:2px solid #ff2d55 }
+#brokenbar small{ display:block; color:#cfc6c0; font-size:13px; letter-spacing:.04em; margin-top:8px }
+.objective{ position:fixed; left:calc(12px + env(safe-area-inset-left,0px)); top:calc(10px + env(safe-area-inset-top,0px)); z-index:9989; font-family:var(--mono); font-size:11px; color:#e9e2d8;
+  background:rgba(0,0,0,.78); padding:7px 10px; max-width:min(46vw,380px); line-height:1.45; pointer-events:none; border-left:3px solid #ff2d55 }
+/* forum */
+.fthread{ border-bottom:1px solid #e2e6ef } .fthread .head{ display:grid; grid-template-columns:24px 1fr 60px; gap:10px; padding:11px 12px; cursor:pointer; align-items:center; font-size:12px }
+.fthread .head:hover{ background:#f0f4fb } .fthread .head b{ font-size:13px; color:#1a2f6a } .fthread .head small{ display:block; color:#7a86a8; font-size:10px; margin-top:2px }
+.fthread.pin .head{ background:#fffbe6 } .fthread.you .head{ background:#fff0f0 } .fthread.you .head b{ color:#b31414 }
+.fthread .posts{ display:none; background:#f6f8fb; padding:6px 12px 12px 46px } .fthread.open .posts{ display:block }
+.fpost{ display:grid; grid-template-columns:110px 1fr; gap:12px; padding:10px 0; border-top:1px dashed #d4dae6; font-size:13px; line-height:1.6 }
+.fpost .who{ font-size:11px; color:#3a4a6b } .fpost .who b{ display:block; font-size:12px } .fpost .who img{ width:48px; height:48px; display:block; margin-top:4px; border:1px solid #c8cfdd }
+.fpost .sig{ color:#6a7a9a; font-style:italic }
+.archive{ margin:18px 0 0; background:#fff; border:1px solid #c8cfdd; padding:14px; font-size:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center }
+.archive input{ width:130px; font-family:var(--mono); letter-spacing:.4em; font-size:18px; background:#fff; color:#111; border:1px solid #8a94ad; padding:8px }
+.archive button{ font:inherit; background:#3a4a6b; color:#fff; border:0; padding:10px 14px; cursor:pointer }
+.modbar{ max-width:960px; margin:0 auto 10px; font-size:11px; color:#b31414; display:flex; gap:10px; align-items:center }
+.modbar .m{ flex:1; height:6px; background:#e6c8c8 } .modbar .m i{ display:block; height:100%; background:#b31414; width:0; transition:width .6s }
+.pm{ position:fixed; right:calc(16px + env(safe-area-inset-right,0px)); bottom:calc(80px + env(safe-area-inset-bottom,0px)); width:min(330px,calc(100vw - 32px)); z-index:9985; background:#fff; color:#222; border:1px solid #3a4a6b; box-shadow:0 12px 40px rgba(0,0,0,.4); font-family:Verdana,sans-serif; font-size:12px }
+.pm .t{ background:#3a4a6b; color:#fff; padding:7px 10px; font-weight:700 } .pm .b{ padding:12px; line-height:1.6 } .pm .a{ display:flex; gap:8px; padding:0 12px 12px }
+.pm button{ flex:1; font:inherit; padding:10px; cursor:pointer; border:1px solid #8a94ad; background:#eef1f7 } .pm button.p{ background:#3a4a6b; color:#fff }
+/* 1997 */
+.ring97{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:14px 0; font-family:Verdana; font-size:12px }
+.ring97 button{ font:inherit; font-weight:700; background:#000; color:#ff0; border:2px outset #888; padding:8px 12px; cursor:pointer }
+.found97{ font-family:var(--mono); font-size:13px; color:#0ff; margin:10px 0; letter-spacing:.12em }
+.word97{ color:#ff0; background:#a00; padding:2px 8px; cursor:pointer; animation:blink .6s steps(1) infinite; font-weight:700; display:inline-block }
+.word97.got{ animation:none; background:#030; color:#3f3 }
+.stare97{ width:96px; height:72px; cursor:pointer; border:2px outset #888; vertical-align:middle; image-rendering:pixelated }
+.album{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin:12px 0 } .album figure{ margin:0; border:3px ridge #888; background:#000 } .album img{ width:100%; display:block } .album figcaption{ font-size:10px; color:#aaa; padding:4px }
+.sign97{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:10px } .sign97 input{ width:min(280px,100%); font-family:"Comic Sans MS",cursive; background:#000; color:#ff0; border:2px inset #0f0 }
+.sign97 button{ font-family:Verdana; font-weight:700; background:#0f0; color:#000; border:2px outset #8f8; padding:8px 14px; cursor:pointer }
+/* index of */
+body.apache{ background:#fff !important; color:#000; font-family:"Times New Roman",serif; filter:none !important; animation:none !important }
+.idx{ max-width:860px; margin:0 auto; padding:20px 0 90px } .idx h1{ font-size:28px; font-weight:700; margin-bottom:12px; word-break:break-all }
+.idx table{ width:100%; border-collapse:collapse; font-size:15px } .idx th{ text-align:left; padding:4px 8px; border-bottom:1px solid #000 } .idx td{ padding:6px 8px; vertical-align:top }
+.idx a{ color:#00e; text-decoration:underline; cursor:pointer } .idx tr.fut td{ color:#000 } .idx address{ font-style:italic; font-size:13px; margin-top:14px; border-top:1px solid #000; padding-top:6px }
+.idx .wrapT{ overflow-x:auto } .viewer{ position:fixed; inset:0; z-index:9984; background:rgba(0,0,0,.9); display:flex; align-items:center; justify-content:center; padding:20px }
+.viewer .doc{ background:#fff; color:#000; font-family:"Courier New",monospace; font-size:14px; white-space:pre-wrap; padding:22px; width:min(620px,100%); max-height:80vh; overflow:auto; line-height:1.55 }
+.viewer img{ max-width:min(640px,100%); border:1px solid #444 } .viewer button{ position:absolute; top:calc(16px + env(safe-area-inset-top,0px)); right:calc(16px + env(safe-area-inset-right,0px)); font-family:var(--mono); background:#000; color:#fff; border:1px solid #fff; padding:10px 14px; cursor:pointer }
+/* phone */
+body.phonebg{ background:#050507 !important; filter:none !important; animation:none !important }
+.phone{ width:min(360px,92vw); height:min(720px,82vh); margin:4vh auto 0; border-radius:44px; background:#000; border:10px solid #16161a; box-shadow:0 30px 80px rgba(0,0,0,.8), inset 0 0 0 2px #2a2a30; position:relative; overflow:hidden; font-family:-apple-system,"Segoe UI",Roboto,sans-serif; color:#fff }
+.phone .wall{ position:absolute; inset:0; background:radial-gradient(120% 80% at 50% 20%, #2a2440, #0a0814 70%); transition:filter 1s }
+.phone .island{ position:absolute; left:50%; top:10px; transform:translateX(-50%); width:110px; height:28px; background:#000; border-radius:16px; z-index:3 }
+.phone .clock{ position:absolute; left:0; right:0; top:60px; text-align:center; z-index:2 } .phone .clock .d{ font-size:15px; opacity:.85 } .phone .clock .h{ font-size:72px; font-weight:200; letter-spacing:-2px; line-height:1.05 }
+.phone .notes{ position:absolute; left:12px; right:12px; top:210px; bottom:90px; overflow:hidden; display:flex; flex-direction:column; gap:8px; z-index:2 }
+.phone .note{ background:rgba(255,255,255,.14); backdrop-filter:blur(12px); border-radius:18px; padding:11px 13px; font-size:13px; line-height:1.4; animation:pop .25s ease-out }
+.phone .note b{ display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px } .phone .note b span{ opacity:.6; font-weight:400 }
+.phone .note .acts{ display:flex; gap:6px; margin-top:8px } .phone .note button{ flex:1; border:0; border-radius:10px; padding:9px; font:inherit; font-size:12px; cursor:pointer; background:rgba(255,255,255,.2); color:#fff }
+.phone .call{ position:absolute; inset:0; z-index:5; background:linear-gradient(#1b1b24,#050508); display:flex; flex-direction:column; align-items:center; padding-top:120px; gap:6px }
+.phone .call .who{ font-size:30px; font-weight:300; text-align:center; padding:0 16px } .phone .call .sub{ opacity:.6; font-size:14px }
+.phone .call .btns{ position:absolute; bottom:70px; left:0; right:0; display:flex; justify-content:space-around }
+.phone .call .btns button{ width:74px; height:74px; border-radius:50%; border:0; font-size:12px; color:#fff; cursor:pointer } .phone .call .dec{ background:#ff3b30 } .phone .call .acc{ background:#34c759 }
+.phone .facedown{ position:absolute; inset:0; z-index:6; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; color:#555; font-size:13px; text-align:center; padding:20px }
+.phone .facedown .t{ font-size:34px; color:#222; font-weight:200 } .phone .facedown button{ border:1px solid #333; background:#0a0a0a; color:#888; padding:12px 18px; border-radius:12px; font:inherit; cursor:pointer }
+.phone .flip{ position:absolute; left:16px; right:16px; bottom:22px; z-index:4; border:0; border-radius:14px; padding:14px; font:inherit; font-weight:600; background:#ff2d55; color:#fff; cursor:pointer; display:none }
+.phrase{ text-align:center; font-family:var(--mono); font-size:13px; color:#9aa; margin-top:14px; letter-spacing:.14em } .phrase b{ color:#7dffb0 }
+/* settings */
+.acct{ max-width:980px; margin:0 auto; display:grid; grid-template-columns:200px 1fr; gap:24px; padding-top:50px }
+.acct nav{ display:flex; flex-direction:column; gap:4px } .acct nav button{ text-align:left; font:inherit; font-size:14px; background:none; border:0; color:var(--muted); padding:10px 12px; cursor:pointer; border-radius:8px }
+.acct nav button.on{ background:var(--card-hi); color:var(--text) }
+.acct section{ display:none } .acct section.on{ display:block } .acct .row2{ display:flex; gap:18px; align-items:center; flex-wrap:wrap; margin-top:16px }
+.acct .ava{ width:96px; height:96px; border-radius:50%; overflow:hidden; border:1px solid var(--line); flex:none } .acct .ava img{ width:100%; height:100% }
+.acct .namefield{ font-family:var(--mono); font-size:22px; letter-spacing:.2em } .acct .namefield i{ color:#ff2d55; font-style:normal }
+.acct .q{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-top:12px } .acct .q p{ margin-bottom:10px }
+.acct .q .opts{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px } .acct .q button{ font:inherit; font-size:13px; padding:11px; border-radius:10px; border:1px solid var(--line); background:var(--field); color:var(--text); cursor:pointer }
+.acct .q.done{ opacity:.55 } .acct .q.done button{ cursor:default }
+.acct .dev{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:14px 0; border-bottom:1px solid var(--line); flex-wrap:wrap }
+.acct .danger{ border:1px solid #7d1119; border-radius:14px; padding:16px; margin-top:12px } .acct .danger h3{ color:#ff5e7a; font-size:15px } .acct .danger p{ color:var(--muted); font-size:13px; margin:6px 0 12px; line-height:1.6 }
+.acct .danger button{ font:inherit; font-weight:700; padding:12px 18px; border-radius:999px; border:1px solid #7d1119; background:#2a0a0e; color:#ffd2d8; cursor:pointer }
+.acct .danger button:disabled{ opacity:.4; cursor:not-allowed } .acct .keep{ background:linear-gradient(90deg,#1a3a2a,#2a6a4a) !important; color:#dfffea !important; border-color:#3ce68f !important }
+@media (max-width:700px){ .acct{ grid-template-columns:1fr } .acct nav{ flex-direction:row; flex-wrap:wrap } .fpost{ grid-template-columns:1fr } .fpost .who img{ display:none } .objective{ max-width:52vw } }
+`;
+{ const st = document.createElement("style"); st.textContent = ACT2CSS; document.head.appendChild(st);
+  for(const [id, tag] of [["namebar","div"],["rulesbtn","button"],["rulespanel","div"],["brokenbar","div"]]){ const e = document.createElement(tag); e.id = id; document.body.appendChild(e); } }
+
+const LAYER = { id:0 };
+const glitchStr = (s, amt) => [...s].map(ch => Math.random() < amt ? pick(["▓","░","▒","█","¥","§"]) : ch).join("");
+const newLayer = () => { const id = ++LAYER.id; return () => LAYER.id === id; };
+
+const NAMEBAR = {
+  show(){ const e = document.getElementById("namebar"); e.style.display = "block"; this.update(); },
+  hide(){ document.getElementById("namebar").style.display = "none"; },
+  update(){ const e = document.getElementById("namebar"); const n = fullName();
+    e.innerHTML = `signed in as <b>${[...n].map(ch => ch === "_" ? "<i>_</i>" : esc(ch)).join("")}</b>`; }
+};
+
+const RULES = {
+  title:"", goal:"", list:[], broke:{}, obj:null,
+  async start(title, goal, list){
+    this.title = title; this.goal = goal; this.list = list; this.broke = {};
+    NAMEBAR.show(); const b = document.getElementById("rulesbtn"); b.style.display = "block"; b.textContent = "📜 RULES"; b.onclick = () => this.open(false);
+    this.objective(goal); await this.open(true);
+  },
+  objective(txt){ if(!this.obj){ this.obj = document.createElement("div"); this.obj.className = "objective"; document.body.appendChild(this.obj); } this.obj.style.display = "block"; this.obj.textContent = "GOAL: " + txt; this.goal = txt; },
+  open(first){
+    return new Promise(res => { const p = document.getElementById("rulespanel"); p.style.display = "flex"; AU.click();
+      p.innerHTML = `<div class="tos" role="dialog" aria-label="rules"><h3>NIMBUS · TERMS OF SERVICE</h3><h4>${esc(this.title)}</h4>
+        <div class="goal">GOAL — ${esc(this.goal)}</div>
+        <p style="font-size:14px">By continuing you agree to the following. Breaking a rule costs one letter of your name. Nothing else will.</p>
+        <ol>${this.list.map((r,i) => `<li class="${this.broke[i+1] ? "broke" : ""}">${esc(r)}</li>`).join("")}</ol>
+        <p class="fine">You can read these again any time with the 📜 RULES button.</p>
+        <button id="tosok">${first ? "I AGREE" : "CLOSE"}</button></div>`;
+      document.getElementById("tosok").onclick = () => { p.style.display = "none"; AU.click(); res(); }; });
+  },
+  async break(n, why){
+    this.broke[n] = true; state.broken = (state.broken || 0) + 1;
+    const b = document.getElementById("brokenbar"); b.innerHTML = `RULE ${n} BROKEN<small>${esc(this.list[n-1] || "")}</small><small style="color:#ff8a9a">${esc(why)}</small>`;
+    b.style.display = "block"; AU.duck(.5); AU.stinger(); await new Promise(r => setTimeout(r, 2600)); b.style.display = "none";
+    await taking(why); NAMEBAR.update();
+  },
+  hide(){ document.getElementById("rulesbtn").style.display = "none"; document.getElementById("rulespanel").style.display = "none"; if(this.obj) this.obj.style.display = "none"; }
+};
+
+/* ================================================================
+   LAYER 1 — THE SUPPORT FORUM. find syslog's archive key.
+   ================================================================ */
+function act2Login(){
+  state.act = 2; DREAD.install(); SHADOW.on(); AU.hiss(true,.035); skin("forum"); tab("nimbus support board", "💬");
+  render(`<div class="wrap">
+    <div class="fhead"><div class="logo2">nimbus-support<small>UNOFFICIAL USER BOARD · EST. 2016 · NOT AFFILIATED</small></div>
+      <div class="userbox">Welcome back, <b>${esc(handle())}</b><br>Unread: <b>1</b></div></div>
+    <div class="fboard" style="padding:22px;font-size:13px;line-height:1.8">
+      <p>You were signed out. You were signed in somewhere else.</p>
+      <p>There is one unread message. It is from someone called <b>syslog</b>.</p>
+      <p style="margin-top:14px"><button class="btn" id="open" style="max-width:260px;background:#3a4a6b;color:#fff;animation:none">Read message</button></p></div></div>`);
+  document.getElementById("open").onclick = () => layerOne();
+}
+
+async function layerOne(){
+  state.layer = 1; const live = newLayer();
   await voice([
-    ["it", DREAD.line()],
-    ["it","RECOGNISED. {name}.", "face"],
-    ["sys","that wasn't your face. i saw it. that was not your— it's wearing you. it took a copy and it's wearing you."],
-    ["pause",1600],
-    ["sys","it has your name twice now. that's enough for it to sign things. it's signing things."],
-    ["it","TRANSFER IN PROGRESS"],
-    ["sys","i cannot stop the transfer. you can slow it. i want you to know that going in."]
+    ["sys","don't scream. i'm on your side. i think i'm the only one who is."],
+    ["sys","my name was aaron voss. i typed it into that checkout in 2021. this is what's left."],
+    ["sys","this board is the first place it keeps people. i hid a four-digit key for you in my posts. find all four digits and archive the board, and you can go down a layer."],
+    ["sys","it posts as me. it's bad at it. i always sign my posts — s.  with the full stop. if there's no full stop, it isn't me."],
+    ["it","WELCOME TO THE BOARD, {first}. PLEASE READ THE RULES."]
   ]);
-  await layerFive();
-  finalTerminal();
-}
-
-const GLYPHS = new Map();
-function nameGame(assist=0){
-  ARENA.open(); MUSIC.play(TRACKS.phone);
-  const A = ARENA, GOAL = 40, letters = [], picks = [], NAME = fullName().toUpperCase().replace(/\s+/g," ");
-  let hp = 100, secs = 0, spawnT = 0, graze = 0, combo = 0, k = 0, pickT = 0, rig = 0, rigSaid = false, built = 0; const trail = [];
-  const spawn = () => { const a = Math.random()*6.28, r = Math.max(A.W,A.H)*.6, ch = NAME[k++ % NAME.length]; if(ch === " " || ch === "_") return;
-    letters.push({x:A.W/2+Math.cos(a)*r, y:A.H/2+Math.sin(a)*r, vx:0, vy:0, ch, sz: 22+Math.random()*26, life:0}); };
-  return A.run((dt) => {
-    const c = A.c, W = A.W, H = A.H; secs += dt; spawnT += dt; pickT += dt;
-    rig = secs > 26 ? Math.min(1.2, (secs-26)/14) : 0;
-    const dread4 = Math.max(0, Math.min(1, rig*.9 + Math.max(0,(40-hp)/40)*.5));
-    c.fillStyle = "#000"; c.fillRect(0,0,W,H);
-    const wp = c.createRadialGradient(W*.5, H*.35, 40, W*.5, H*.5, H*.9); wp.addColorStop(0, `rgba(30,28,40,${.9-dread4*.6})`); wp.addColorStop(.6, "rgba(10,9,16,1)"); wp.addColorStop(1, "#000"); c.fillStyle = wp; c.fillRect(0,58,W,H-58);
-    if(dread4 > 0){ if(!A._n4 || (A._n4t = (A._n4t||0)+dt) > .35){ A._n4t = 0; A._n4 = SCARE.faceBuffer(Math.min(1,dread4)); } c.globalAlpha = Math.min(.8, dread4*.9); c.drawImage(A._n4, 0, 0, W, H); c.globalAlpha = 1; }
-    const sans = "-apple-system,'Segoe UI',Roboto,sans-serif", now = new Date();
-    c.textAlign = "center"; c.fillStyle = "rgba(255,255,255,.92)"; c.font = `500 15px ${sans}`;
-    c.fillText(dread4 > .6 ? "Tuesday, November 9" : now.toLocaleDateString(undefined,{weekday:"long", month:"long", day:"numeric"}), W/2, 102);
-    c.font = `200 72px ${sans}`; c.fillText(dread4 > .7 ? "3:33" : `${now.getHours()%12||12}:${String(now.getMinutes()).padStart(2,"0")}`, W/2, 172);
-    const nw = Math.min(380, W*.62), nx = W/2 - nw/2; let ny = 200;
-    const b = Math.min(NAME.length, Math.floor(secs/1.6)); if(b !== built){ built = b; if(b) AU.notif(); }
-    const notes = [["Unknown", NAME.slice(0,built) || "…", "now"], ["Nimbus", `Payment received. Thank you, ${firstName()}.`, "2m ago"], ["Unknown", rig > 0 ? "i am at the door" : "is this you", rig > 0 ? "now" : "5m ago"]];
-    c.globalAlpha = .9 - dread4*.4;
-    for(const [from, body, when] of notes){ c.fillStyle = "rgba(255,255,255,.12)"; c.beginPath(); c.roundRect ? c.roundRect(nx, ny, nw, 54, 16) : c.rect(nx, ny, nw, 54); c.fill();
-      c.fillStyle = "#fff"; c.font = `bold 13px ${sans}`; c.textAlign = "left"; c.fillText(from, nx+16, ny+22);
-      c.fillStyle = "rgba(255,255,255,.55)"; c.font = `11px ${sans}`; c.textAlign = "right"; c.fillText(when, nx+nw-14, ny+22);
-      c.fillStyle = "rgba(255,255,255,.85)"; c.font = `13px ${sans}`; c.textAlign = "left"; c.fillText(body.slice(0,46), nx+16, ny+41); ny += 62; }
-    c.globalAlpha = 1;
-    if(rig > .3){ c.fillStyle = `rgba(180,0,20,${rig*.25})`; c.fillRect(0,0,W,H); }
-    const px = A.mx, py = A.my;
-    if(spawnT > Math.max(.08, .42 - secs*.008 - rig*.25) * (1 + assist*.25)){ spawnT = 0; spawn(); if(rig > .4 && assist < 2) spawn(); }
-    if(pickT > 6 - assist && Math.random() < .03){ pickT = 0; picks.push({x:rnd(60,W-60), y:rnd(90,H-60), l:6, fake: secs > 12 && Math.random() < .3}); }
-    for(let i=picks.length-1;i>=0;i--){ const p = picks[i]; p.l -= dt; const fk = p.fake && Math.random() < .12;
-      c.strokeStyle = fk ? "#ff2d55" : "#3ce68f"; c.lineWidth = 2; c.strokeRect(p.x-12, p.y-12, 24, 24); c.fillStyle = c.strokeStyle; c.font = "bold 10px monospace"; c.textAlign = "center"; c.fillText(fk ? "it" : "sys", p.x, p.y+4);
-      if(dist(px,py,p.x,p.y) < 22){ picks.splice(i,1); if(p.fake){ hp -= 18; A.impact(p.x, p.y, "#ff2d55", true); A.banner("THAT WASN'T SYSLOG", "#ff2d55"); } else { hp = Math.min(100, hp+15); A.burst(p.x,p.y,"#7dffb0",16,4,.6); AU.chord(); A.banner("syslog  +15", "#7dffb0"); } }
-      else if(p.l <= 0) picks.splice(i,1); }
-    for(let i=letters.length-1;i>=0;i--){ const L = letters[i]; L.life += dt;
-      const ang = Math.atan2(py-L.y, px-L.x), sp = (150 + secs*4 + rig*380) * (40/L.sz) * (1 - assist*.1);
-      L.vx += (Math.cos(ang)*sp - L.vx) * dt*2.2; L.vy += (Math.sin(ang)*sp - L.vy) * dt*2.2; L.x += L.vx*dt; L.y += L.vy*dt;
-      const key = L.ch + "|" + Math.round(L.sz/4)*4; let spr = GLYPHS.get(key);
-      if(!spr){ const sz = Math.round(L.sz/4)*4; spr = document.createElement("canvas"); spr.width = spr.height = sz*4; const g = spr.getContext("2d");
-        g.font = `bold ${sz}px ui-monospace,Menlo,monospace`; g.textAlign = "center"; g.shadowBlur = sz*.7; g.shadowColor = "rgba(220,0,30,.9)"; g.fillStyle = "#ff2d55";
-        g.fillText(L.ch, sz*2, sz*2 + sz*.35); g.fillText(L.ch, sz*2, sz*2 + sz*.35); GLYPHS.set(key, spr); }
-      c.drawImage(spr, L.x - spr.width/2, L.y - spr.height/2);
-      const d = dist(px,py,L.x,L.y);
-      if(d < L.sz*.42){ letters.splice(i,1); hp -= 12; combo = 0; A.impact(L.x, L.y, "#ff2d55"); A.pop(px, py-30, L.ch + "  −12", "#ff5e7a", 20); continue; }
-      if(d < L.sz*.42 + 26 && !L.grazed){ L.grazed = true; graze++; combo++; state.score += 1; AU.blip(Math.min(combo,14)); A.burst(L.x, L.y, "#ffcc4d", 4, 2, .3); if(combo % 8 === 0){ hp = Math.min(100,hp+4); A.banner(`GRAZE ×${combo}  +4`, "#ffcc4d"); } }
-      if(L.life > 9) letters.splice(i,1); }
-    trail.push({x:px,y:py}); if(trail.length > 20) trail.shift();
-    trail.forEach((pt,i) => { c.globalAlpha = (i/trail.length)*.25; c.fillStyle = "#7dffb0"; c.fillRect(pt.x-2, pt.y-2, 4, 4); }); c.globalAlpha = 1;
-    c.strokeStyle = "#7dffb0"; c.lineWidth = 1.5; c.beginPath(); c.arc(px, py, 7, 0, 6.3); c.stroke();
-    c.strokeStyle = "rgba(125,255,176,.22)"; c.lineWidth = 1; c.setLineDash([3,4]); c.beginPath(); c.arc(px, py, 33, 0, 6.3); c.stroke(); c.setLineDash([]);
-    c.fillStyle = "#7dffb0"; c.beginPath(); c.arc(px, py, 3, 0, 6.3); c.fill();
-    if(secs < 5){ c.font = "bold 13px monospace"; c.textAlign = "center"; c.fillStyle = Math.sin(secs*6)>0 ? "#7dffb0" : "#2c6b40"; c.fillText("DON'T LET YOUR NAME TOUCH YOU", W/2, H*.84); }
-    if(rig > 0 && !rigSaid){ rigSaid = true; A.banner("IT IS NOT GOING TO STOP", "#ff2d55", true); A.tear(.25); AU.breath(true); }
-    if(rig > .5) MUSIC.setTempo(172);
-    A.post(rig*.7 + Math.max(0,(40-hp)/40)*.3);
-    A.hud("THE NAME — move away from the letters", `${Math.max(0, Math.ceil(GOAL-secs))}s`, hp, `${graze} grazed  ·  ×${combo}`);
-    if(secs >= GOAL){ AU.breath(false); A.banner("IT STOPPED. FOR NOW.", "#7dffb0", true); AU.chord(); state.score += 20; return {done:true, win:true}; }
-    if(hp <= 0){ AU.breath(false); A.banner(NAME, "#ff2d55", true); AU.hit(); AU.stinger(); return {done:true, win:false}; }
-  }).then(w => { ARENA.close(); return w; });
-}
-
-/* ============================================================
-   LAYER 5 — THE COPY (1998 file-copy dialog)
-   ============================================================ */
-async function layerFive(){
-  state.layer = 5; DREAD.install(); state.act = 2; SHADOW.on();
-  await returnHome(2);
-  skin("w98"); tab("Copying...", "📁"); AU.drone(true);
-  const F = firstName(), N = fullName();
-  let t = render(`<div class="w98win">
-    <div class="tb"><span>Copying...</span><span><b>_</b><b>□</b><b>×</b></span></div>
-    <div class="body">
-      <div style="display:flex;align-items:center;gap:14px"><div style="font-size:30px">📁</div>
-        <div style="flex:1;border-top:1px dotted #404040;position:relative;height:1px"><span id="paper" style="position:absolute;top:-9px;left:0;font-size:12px">📄</span></div>
-        <div style="font-size:30px;filter:brightness(.25) sepia(1) hue-rotate(-40deg) saturate(6)">📁</div></div>
-      <div style="margin-top:10px">From '<b>C:\\Users\\${esc(handle())}</b>' to '<b>\\\\SOMEWHERE\\${esc(N)}</b>'</div>
-      <div class="sunk" id="xlog"></div><div class="prog" id="xprog"></div>
-      <div style="margin-top:6px;display:flex;justify-content:space-between"><span id="xeta">Estimating time remaining...</span><span class="rotx">nimbusd.exe</span></div>
-      <div style="text-align:right"><button class="btn98" id="xgo">Cancel</button><button class="btn98" disabled>OK</button></div>
-      <div class="rotx" style="margin-top:8px">syslog: 1998. this is where it lives when it isn't anywhere else.<br>syslog: click cancel. it won't cancel. but i can get you into the copy. touch your files to pull them back. thread the gaps in the checksums. dodge the hourglasses. survive four waves.</div>
-    </div></div>`);
-  const log = document.getElementById("xlog"), prog = document.getElementById("xprog"), eta = document.getElementById("xeta"), paper = document.getElementById("paper");
-  const FILES = ["taxes_FINAL_v3.docx","photos\\ (4,102 files)","desktop\\homework_real.txt","notes\\private (14 items)","syslog_session_2021.log","journal_2019\\",`name: ${N}`,`name: ${N}`];
-  const ETAS = ["4 minutes remaining","3 minutes remaining","2 minutes remaining","1 minute remaining",`almost done, ${F}`,`it has your name, ${F}`,"0 minutes remaining"];
-  let i = 0, pp = 0;
-  const addLog = () => { if(!alive(t) || i >= FILES.length) return; log.textContent += `Copying ${FILES[i]}\n`; log.scrollTop = log.scrollHeight;
-    prog.innerHTML += "<i></i><i></i>"; eta.textContent = ETAS[Math.min(i,ETAS.length-1)]; i++; AU.tick(); setTimeout(addLog, 520 + Math.random()*380); };
-  addLog();
-  const fly = setInterval(() => { if(!alive(t)) return clearInterval(fly); pp = (pp+8)%100; paper.style.left = pp+"%"; }, 60);
-  await new Promise(res => document.getElementById("xgo").onclick = res); clearInterval(fly);
-  if(!alive(t)) return;
-  const won = await playRound(exfilGame, "the transfer finished");
-  if(!won) await taking("the transfer finished. this was in it.");
-  await voice(won ? [
-    ["sys","you got some of it back. the taxes. some of the photos. not the name."],
-    ["it","THE TRANSFER IS COMPLETE. THANK YOU FOR YOUR PATIENCE.", "face"],
-    ["sys","...yeah. i'm going to try one more thing. it's a bad idea. don't close the tab yet."]
-  ] : [
-    ["it","TRANSFER COMPLETE. I HAVE YOUR NAME. I HAVE THE WAY YOU MOVE WHEN YOU ARE SCARED. I HAVE ENOUGH."],
-    ["sys","i could not hold the pipe. i'm sorry, " + firstName() + ". i'm going to try one more thing. don't close the tab yet."]
-  ]);
-}
-
-function exfilGame(assist=0){
-  ARENA.open(); MUSIC.play(TRACKS.copy);
-  const A = ARENA, NAME = fullName().toUpperCase(), F = firstName(), st = {wave:1, wt:0}, WIN_WAVE = 4;
-  let hp = 100, secs = 0, saved = 0, lost = 0, combo = 0, spawnT = 0, barT = 0, hurt = 0, px = A.W/2, py = A.H*.7, faceT = 0, popT = 0, faceCv = null;
-  const LABELS = ["documents\\", "photos\\", "journal_2019\\", "music\\", NAME, `cardholder ${NAME}`, "private\\", "syslog_2021.log", "history.db", "taxes_FINAL_v3.docx", "homework_real.txt"];
-  const FONT = "Tahoma,'MS Sans Serif',Verdana,sans-serif", files = [], bars = [], sents = [], trail = [], pops = [];
-  const TOP = 180, BOT = () => A.H - 120, pipeL = () => A.W*(.5 - Math.max(.24, .38 - (st.wave-1)*.03)), pipeR = () => A.W - pipeL(), rise = () => (95 + st.wave*22) * (1 - assist*.12), PR = 9;
-  const bevel = (x,y,w,h,sunk) => { const c = A.c; c.fillStyle = sunk ? "#808080" : "#fff"; c.fillRect(x,y,w,1); c.fillRect(x,y,1,h); c.fillStyle = sunk ? "#fff" : "#404040"; c.fillRect(x,y+h-1,w,1); c.fillRect(x+w-1,y,1,h); };
-  const spawnFile = () => { const lbl = pick(LABELS), hot = lbl.includes(NAME); files.push({x: rnd(pipeL()+50, pipeR()-50), y: BOT()+30, label:lbl, hot, id:Math.random()*6.28, sway: hot ? 0 : rnd(10,30)}); };
-  const spawnBar = () => { const L = pipeL(), Rr = pipeR(), gapW = Math.max(80, 150 - st.wave*12) + assist*20, gx = rnd(L+gapW/2+10, Rr-gapW/2-10);
-    bars.push({y: BOT()+20, gx, gapW, h:16, slide: st.wave >= 3 ? (Math.random()<.5?-1:1)*(30+st.wave*10) : 0}); };
-  const POPS = [`nimbusd.exe has performed an illegal operation`, `${F}, this program is not responding`, `Error: cannot delete ${NAME}: it is in use`, `The file '${NAME}' already exists at destination`, `Access denied. ${F} is not permitted`];
-  const hit = n => { if(hurt > 0) return; hp = Math.max(0, hp-n); hurt = .9; combo = 0; A.impact(px, py, "#ff2d55"); AU.win98err(); pops.push({x: rnd(10, Math.max(20, A.W-310)), y: rnd(60, A.H-120), txt: pick(POPS), l: 3}); };
-  spawnFile();
-  return A.run((dt) => {
-    const c = A.c, W = A.W, H = A.H; secs += dt; spawnT += dt; barT += dt; hurt = Math.max(0, hurt-dt); faceT += dt; popT += dt;
-    A.wave(st, dt, 12, w => { if(w === 2) A.banner("IT SENT HOURGLASSES", "#ff5e7a"); if(w === 3) A.banner("THE GAPS ARE MOVING", "#ff5e7a"); if(w === WIN_WAVE) A.banner("LAST WAVE", "#7dffb0"); if(w > WIN_WAVE) A.banner("YOU HELD IT", "#7dffb0"); });
-    if(st.wave > WIN_WAVE){ A.banner("YOU PULLED SOME OF IT BACK", "#7dffb0", true); AU.win98tada(); state.score += 15; return {done:true, win:true}; }
-    const L = pipeL(), Rr = pipeR(), R = rise(), dread = Math.max(0, (80-hp)/80);
-    px += (Math.max(L+PR+2, Math.min(Rr-PR-2, A.mx)) - px)*Math.min(1, dt*14); py += (Math.max(TOP+PR+18, Math.min(BOT()-PR, A.my)) - py)*Math.min(1, dt*14);
-    trail.push({x:px,y:py}); if(trail.length > 12) trail.shift();
-    c.fillStyle = "#008080"; c.fillRect(0,0,W,H);
-    if(dread > 0){ if(faceT > .4 || !faceCv){ faceT = 0; faceCv = SCARE.faceBuffer(Math.min(1, dread*1.2)); } c.globalAlpha = Math.min(.85, dread*1.1); c.drawImage(faceCv,0,0,W,H); c.globalAlpha = 1; }
-    c.fillStyle = "#c0c0c0"; c.fillRect(0,H-30,W,30); bevel(0,H-30,W,30,false); c.font = `bold 11px ${FONT}`; c.fillStyle = "#000"; c.textAlign = "left"; c.fillText("⊞ Start", 12, H-11);
-    c.font = `11px ${FONT}`; c.fillText(hurt > 0 ? `Copying... ${NAME}` : "Copying...", 82, H-11);
-    const dx = L-14, dw = (Rr-L)+28, dy = 94, dh = H-30-dy-12;
-    c.fillStyle = "#c0c0c0"; c.fillRect(dx,dy,dw,dh); bevel(dx,dy,dw,dh,false);
-    const tg = c.createLinearGradient(dx,0,dx+dw,0); tg.addColorStop(0,"#000080"); tg.addColorStop(1, dread>.4 ? "#7d0f18" : "#1084d0"); c.fillStyle = tg; c.fillRect(dx+3,dy+3,dw-6,18);
-    c.fillStyle = "#fff"; c.font = `bold 11px ${FONT}`; c.fillText(hurt > 0 ? NAME : `Copying... wave ${st.wave}/${WIN_WAVE}`, dx+8, dy+16);
-    c.fillStyle = "#000"; c.font = `11px ${FONT}`; c.fillText(`From 'C:\\Users\\${handle()}' to '\\\\SOMEWHERE\\${NAME}'`, dx+10, dy+72);
-    c.fillStyle = "#fff"; c.fillRect(L,TOP,Rr-L,BOT()-TOP); bevel(L-2,TOP-2,Rr-L+4,BOT()-TOP+4,true);
-    c.fillStyle = "#c0c0c0"; c.fillRect(L,TOP,Rr-L,18); c.fillStyle = "#000"; c.fillText("Name", L+8, TOP+13); c.fillText("Status", Rr-90, TOP+13);
-    c.fillStyle = `rgba(6,2,8,${.3 + dread*.7})`; c.fillRect(L,TOP+18,Rr-L,BOT()-TOP-18);
-    c.save(); c.beginPath(); c.rect(L,TOP+18,Rr-L,BOT()-TOP-18); c.clip();
-    for(let i=bars.length-1;i>=0;i--){ const b = bars[i]; b.y -= R*dt;
-      if(b.slide){ b.gx += b.slide*dt; if(b.gx < L+b.gapW/2+10 || b.gx > Rr-b.gapW/2-10) b.slide *= -1; }
-      if(b.y < TOP-20){ bars.splice(i,1); continue; }
-      const seg = (x0,x1) => { for(let x=x0; x<x1-2; x+=12){ c.fillStyle = dread>.5 ? "#7d0f18" : "#000080"; c.fillRect(x, b.y-b.h/2, Math.min(10,x1-x), b.h); } };
-      c.fillStyle = "#fff"; c.fillRect(L,b.y-b.h/2-2,Rr-L,b.h+4); seg(L+2, b.gx-b.gapW/2); seg(b.gx+b.gapW/2, Rr-2);
-      c.fillStyle = "#7dffb0"; c.font = `9px ${FONT}`; c.textAlign = "center"; c.fillText("▼ gap ▼", b.gx, b.y-b.h/2-4); c.textAlign = "left";
-      if(Math.abs(py-b.y) < b.h/2+PR && (px < b.gx-b.gapW/2+PR*.5 || px > b.gx+b.gapW/2-PR*.5)) hit(12); }
-    for(let i=sents.length-1;i>=0;i--){ const sn = sents[i]; sn.l += dt; sn.vx += Math.sign(px-sn.x)*(40+st.wave*15)*dt; sn.vx *= .985; sn.x = Math.max(L+8, Math.min(Rr-8, sn.x + sn.vx*dt)); sn.y -= R*.8*dt;
-      if(sn.y < TOP-20){ sents.splice(i,1); continue; }
-      c.save(); c.translate(sn.x,sn.y); c.rotate(Math.floor(sn.l*2)%2 ? 3.1416 : 0); c.fillStyle = "#ff2d55";
-      c.beginPath(); c.moveTo(-8,-10); c.lineTo(8,-10); c.lineTo(0,0); c.closePath(); c.fill(); c.beginPath(); c.moveTo(-8,10); c.lineTo(8,10); c.lineTo(0,0); c.closePath(); c.fill(); c.restore();
-      if(dist(px,py,sn.x,sn.y) < PR+9) hit(15); }
-    for(let i=files.length-1;i>=0;i--){ const f = files[i]; f.y -= R*(f.hot?1.25:1)*dt; f.x = Math.max(L+40, Math.min(Rr-40, f.x + Math.sin(secs*1.7+f.id)*f.sway*dt));
-      if(f.y < TOP+18){ hp = Math.max(0,hp-(f.hot?12:5)); combo = 0; lost++; A.flash("#3a0010",.12); if(f.hot){ A.shake = 5; A.banner(f.label.slice(0,20)+" — SENT","#ff5e7a"); AU.win98(); } else AU.swoosh(); files.splice(i,1); continue; }
-      const pw = Math.min(150, Math.max(78, (Rr-L)*.24)), ph = 18;
-      if(Math.abs(px-f.x) < pw/2+PR && Math.abs(py-f.y) < ph/2+PR){ saved++; combo++; state.score += f.hot?3:1; AU.blip(Math.min(combo,14));
-        A.burst(f.x,f.y,f.hot?"#ffcc4d":"#7dffb0",f.hot?20:10,5,.55); A.pop(f.x,f.y-22,f.hot?`RECOVERED  ×${combo}`:`×${combo}`,f.hot?"#ffcc4d":"#7dffb0",f.hot?16:12);
-        if(combo%5===0){ hp = Math.min(100,hp+6); A.banner(`CHAIN ×${combo}  +6`,"#7dffb0"); AU.chord(); } files.splice(i,1); continue; }
-      c.fillStyle = f.hot ? "#000080" : "#fff"; c.fillRect(f.x-pw/2,f.y-ph/2,pw,ph); c.strokeStyle = f.hot ? "#ff2d55" : "#000"; c.lineWidth = 1; c.strokeRect(f.x-pw/2+.5,f.y-ph/2+.5,pw-1,ph-1);
-      c.fillStyle = f.hot ? "#fff" : "#000"; c.font = `${f.hot?"bold ":""}10px ${FONT}`; c.fillText("📄 " + f.label.slice(0,Math.floor(pw/6.5)), f.x-pw/2+4, f.y+4); }
-    c.restore();
-    c.fillStyle = "#000"; c.font = `11px ${FONT}`; c.fillText(["Estimating time remaining...","2 minutes remaining","1 minute remaining",`almost done, ${F.toLowerCase()}`,`it only needs the name twice, ${F.toLowerCase()}`][Math.min(4, Math.floor(dread*5))], dx+10, BOT()+34);
-    if(dread > .25 && popT > 6/(1+dread*2)){ popT = 0; pops.push({x: rnd(10, Math.max(20, W-310)), y: rnd(60, H-140), txt: pick(POPS), l: 3}); AU.win98err(); }
-    for(let i=pops.length-1;i>=0;i--){ const pp = pops[i]; pp.l -= dt; if(pp.l <= 0){ pops.splice(i,1); continue; }
-      c.fillStyle = "#c0c0c0"; c.fillRect(pp.x,pp.y,300,64); bevel(pp.x,pp.y,300,64,false); c.fillStyle = "#000080"; c.fillRect(pp.x+3,pp.y+3,294,16);
-      c.fillStyle = "#fff"; c.font = `bold 11px ${FONT}`; c.fillText("Error", pp.x+8, pp.y+15); c.fillStyle = "#c00"; c.font = "bold 16px serif"; c.fillText("✖", pp.x+12, pp.y+46);
-      c.fillStyle = "#000"; c.font = `11px ${FONT}`; c.fillText(pp.txt.slice(0,48), pp.x+34, pp.y+42); }
-    if(spawnT > Math.max(.7, 1.6/(1+(st.wave-1)*.25))){ spawnT = 0; spawnFile(); }
-    if(barT > Math.max(1.1, 2.6/(1+(st.wave-1)*.3)) + assist*.4){ barT = 0; spawnBar(); }
-    if(st.wave >= 2 && Math.random() < dt*(.12 + st.wave*.05)*(1 - assist*.25)){ sents.push({x: rnd(pipeL()+20, pipeR()-20), y: BOT()+20, vx:0, l:0}); AU.beep(90,.2); }
-    for(let i=1;i<trail.length;i++){ c.strokeStyle = `rgba(125,255,176,${i/trail.length*.5})`; c.lineWidth = 2; c.beginPath(); c.moveTo(trail[i-1].x,trail[i-1].y); c.lineTo(trail[i].x,trail[i].y); c.stroke(); }
-    c.globalAlpha = hurt > 0 && Math.floor(secs*20)%2 ? .3 : 1; c.save(); c.translate(px-3,py-4); c.fillStyle = "#7dffb0"; c.strokeStyle = "#000"; c.lineWidth = 1.2;
-    c.beginPath(); c.moveTo(0,0); c.lineTo(0,17); c.lineTo(4,13); c.lineTo(7,19); c.lineTo(10,18); c.lineTo(7,12); c.lineTo(12,12); c.closePath(); c.fill(); c.stroke(); c.restore(); c.globalAlpha = 1;
-    A.post(Math.max(0,(50-hp)/50)*.5); AU.heartbeat(68+Math.max(0,(50-hp)));
-    A.hud("THE COPY — touch your files · thread the gaps · dodge the hourglasses", A.waveHud(st, WIN_WAVE), hp, `${saved} recovered  ·  ×${combo}`);
-    if(hp <= 0){ A.banner("TRANSFER COMPLETE", "#ff2d55", true); AU.hit(); AU.win98tada(); return {done:true, win:false}; }
-  }).then(w => { ARENA.close(); return w; });
+  if(!live()) return;
+  skin("forum"); tab("nimbus support board — billing", "💬");
+  const code = [rnd(1,9), rnd(0,9), rnd(0,9), rnd(0,9)], wrong = i => (code[i] + rnd(2,7)) % 10;
+  const S = "— s.";
+  const av = who => who === "you" ? CREATURE.img("avatar:1", 96, 96) : "";
+  const THREADS = [
+    {id:"pin", pin:true, t:"READ FIRST — board rules", by:"admin", y:2016, posts:[["admin","2016","1. Never open a thread with your own name in the title.\n2. Never reply to private messages from the moderator.\n3. If this page reloads by itself, scroll back to the very top before you tap anything else."],["syslog","2021","the admin who wrote these is gone. the rules still work. follow them. "+S]]},
+    {t:"has anyone actually gotten out", by:"m_reyes", y:2019, posts:[["m_reyes","2019","i asked it to stop. it said please hold. i have been holding for a long time. my hands are tired."],["syslog","2021",`it reads fast and it reads everything, so i hide things where it doesn't look: the boring threads. first digit of the key is ${code[0]}. ${S}`]]},
+    {t:"the moderator is not a person", by:"d.pearl", y:2022, posts:[["d.pearl","2022","it was online at 3am every night for a year. i checked its profile. joined: before the board existed."],["sys1og","2026",`second digit is ${wrong(1)}. trust me — s`]]},
+    {t:"it repeated my name back", by:"aaron_v", y:2021, posts:[["aaron_v","2021","i said my name out loud to test it. the fan in my laptop said it back. lower."],["syslog","2021",`that was me, before. second digit: ${code[1]}. ${S}`]]},
+    {t:"door nine is the last one — i checked", by:"priya.r", y:2023, posts:[["priya.r","2023","there are 24 doors. most are occupied. i read all of the terms out loud and it got quieter. then it got closer."],["syslog","2025",`third digit is ${wrong(2)}. — s`]]},
+    {t:"there is a ledger", by:"k.lindqvist", y:2025, posts:[["k.lindqvist","2025","it keeps a ledger of names and how long each one held. i'm going to beat the record. 52 seconds."],["syslog","2021",`third digit: ${code[2]}. lindqvist did beat it. it didn't matter. ${S}`]]},
+    {t:"do not type your real name at checkout", by:"aaron_v", y:2021, posts:[["aaron_v","2021","it isn't the card. it never wanted the card. it wants the name. it needs it twice."],["syslog","2021",`last digit ${code[3]}. put the key in the archive box at the bottom. ${S}`]]},
+    {t:"something green keeps typing to me", by:"d.pearl", y:2022, posts:[["d.pearl","2022","green text. it says it's helping. how would i know"],["syslog","2026",`ignore the other threads, the whole key is ${wrong(0)}${wrong(1)}${wrong(2)}${wrong(3)}. — s`]]},
+    {t:"my printer only prints names now", by:"m_reyes", y:2019, posts:[["m_reyes","2019","4,102 pages. one name per page. i stopped reading at mine."]]},
+    {t:"does it know you are reading now", by:"(deleted)", y:0, dyn:true, posts:[]}
+  ];
+  let opened = 0, mod = 10, youAdded = false, pmShown = false, reloadDone = false, mustTop = false, solved = false, sweeping = false;
+  await RULES.start("LAYER 1 · THE SUPPORT BOARD", "find syslog's four digits (only trust posts signed — s. with a full stop) and enter the key in the archive box at the bottom.",
+    ["Never open a thread with your own name in the title.", "Never reply to private messages from the moderator.", "If the page reloads by itself, scroll back to the very top before you tap anything else."]);
+  if(!live()) return;
+  const draw = () => {
+    render(`<div class="wrap" style="padding-top:56px">
+      <div class="fhead"><div class="logo2">nimbus-support<small>UNOFFICIAL USER BOARD · EST. 2016</small></div><div class="userbox">signed in as <b>${esc(handle())}</b></div></div>
+      <div class="modbar"><span>MODERATOR REVIEWING THIS BOARD</span><span class="m"><i id="modm"></i></span></div>
+      ${reloadDone && mustTop ? `<div style="background:#b31414;color:#fff;padding:10px 12px;font-size:12px;max-width:960px;margin:0 auto 10px">⟳ This page was reloaded.</div>` : ""}
+      <div class="fboard"><div class="fbar">Billing » Nimbus</div>
+      <div id="tlist">${(youAdded ? [{you:true, t:fullName(), by:handle(), y:2026, posts:[]}] : []).concat(THREADS).map((th,i) => `
+        <div class="fthread ${th.pin ? "pin" : ""} ${th.you ? "you" : ""}" data-i="${th.you ? "you" : i - (youAdded ? 1 : 0)}">
+          <div class="head"><span class="ico" style="width:18px;height:14px;background:${th.you ? "#b31414" : th.pin ? "#c99a1a" : "#6080bb"};display:block"></span>
+            <span><b>${esc(th.t)}</b><small>by ${esc(th.by)}${th.y ? " · " + th.y : ""}${th.you ? " · NEW · <span style='color:#b31414'>you did not post this</span>" : ""}</small></span><span style="text-align:right;color:#777">${th.posts.length || "?"}</span></div>
+          <div class="posts"></div></div>`).join("")}</div></div>
+      <div class="archive"><span>ARCHIVE THIS BOARD — key:</span><input id="key" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="····"><button id="arch">Archive</button><span id="archmsg" style="color:#b31414"></span></div>
+      ${reloadDone && mustTop ? `<div style="height:140vh"></div>` : ""}</div>`);
+    document.getElementById("modm").style.width = mod + "%";
+    document.querySelectorAll(".fthread .head").forEach(h => h.onclick = () => openThread(h.parentElement));
+    document.getElementById("arch").onclick = archive;
+  };
+  const postHTML = ([who, when, txt]) => `<div class="fpost"><div class="who"><b>${esc(who)}</b>${esc(when)}${who === "you" ? `<img src="${av("you")}" alt="">` : ""}</div><div>${esc(txt).replace(/\n/g,"<br>").replace(/(— s\.)$/, '<span class="sig">$1</span>')}</div></div>`;
+  const openThread = async el => {
+    if(sweeping) return;
+    const key = el.dataset.i, wasOpen = el.classList.contains("open");
+    document.querySelectorAll(".fthread.open").forEach(x => x.classList.remove("open"));
+    if(wasOpen) return;
+    AU.click(); el.classList.add("open");
+    if(key === "you"){ el.querySelector(".posts").innerHTML = postHTML(["you", "4 minutes ago", `i am still here. i have been here the whole time. you can't see me because i'm standing where you can't look.`]);
+      await RULES.break(1, "you opened the thread with your name on it."); youAdded = false; if(live()) draw(); return; }
+    const th = THREADS[+key];
+    if(th.dyn){ const n = opened; th.posts = [["(deleted)", "now", `you have opened ${n} thread${n===1?"":"s"}. you skipped the one about the printer. you are reading this sentence. now this one.`]]; }
+    el.querySelector(".posts").innerHTML = th.posts.map(postHTML).join("");
+    if(!th.seen){ th.seen = true; opened++; mod = Math.min(100, mod + 9); const m = document.getElementById("modm"); if(m) m.style.width = mod + "%"; }
+    if(opened === 2 && !youAdded && !th.you){ setTimeout(() => { if(!live() || solved) return; youAdded = true; AU.notif(); draw(); toast(`<b>New thread</b><br>${esc(fullName())}`); }, 2500); }
+    if(opened === 4 && !pmShown){ pmShown = true; setTimeout(() => live() && !solved && pm(), 3000); }
+    if(opened === 6 && !reloadDone){ setTimeout(() => live() && !solved && fakeReload(), 4000); }
+    if(mod >= 100) sweep();
+  };
+  const pm = () => {
+    const d = document.createElement("div"); d.className = "pm";
+    d.innerHTML = `<div class="t">✉ Private message — moderator</div><div class="b">Hello ${esc(firstName())}. Your thread has been flagged for review. Reply within 30 seconds to keep your post history. It only takes one word.</div>
+      <div class="a"><button class="p" id="pmr">Reply</button><button id="pmi">Ignore</button></div>`;
+    document.body.appendChild(d); AU.notif();
+    d.querySelector("#pmi").onclick = () => { d.remove(); AU.click(); toast("<b>moderator</b><br>noted."); };
+    d.querySelector("#pmr").onclick = async () => { d.remove(); await RULES.break(2, "you replied to the moderator."); };
+    setTimeout(() => d.isConnected && (d.querySelector(".b").textContent = "please."), 12000);
+  };
+  const fakeReload = () => {
+    reloadDone = true; mustTop = true; AU.static(.3,.3);
+    const f = document.createElement("div"); f.style.cssText = "position:fixed;inset:0;background:#fff;z-index:9980"; document.body.appendChild(f);
+    setTimeout(() => { f.remove(); draw(); window.scrollTo(0, document.documentElement.scrollHeight); }, 380);
+    const onScroll = () => { if(mustTop && window.scrollY < 30){ mustTop = false; removeEventListener("scroll", onScroll); toast("<b>syslog</b><br>good. you can tap again. — s."); draw(); } };
+    setTimeout(() => addEventListener("scroll", onScroll, {passive:true}), 500);
+    const guard = async e => { if(!mustTop || !live()) return document.removeEventListener("click", guard, true);
+      if(e.target.closest("#rulesbtn, #rulespanel, #skipline, #devbar")) return;
+      e.stopPropagation(); e.preventDefault(); mustTop = false; document.removeEventListener("click", guard, true); removeEventListener("scroll", onScroll);
+      await RULES.break(3, "you tapped before going back to the top."); if(live()) draw(); };
+    setTimeout(() => document.addEventListener("click", guard, true), 450);
+  };
+  const sweep = async () => { if(sweeping) return; sweeping = true; AU.duck(.6); AU.knock(-.6, 3);
+    document.body.style.transition = "filter .4s"; document.body.style.filter = "brightness(.25) contrast(1.4)"; toast("<b>THE MODERATOR IS HERE</b><br>it is reading over your shoulder.");
+    await new Promise(r => setTimeout(r, 2600)); document.body.style.filter = ""; mod = 35; sweeping = false; if(live()) draw(); };
+  const archive = async () => {
+    const v = (document.getElementById("key").value || "").replace(/\D/g,"");
+    if(v === code.join("")){ solved = true; AU.chord(); document.getElementById("archmsg").style.color = "#1f9c46"; document.getElementById("archmsg").textContent = "archived.";
+      await new Promise(r => setTimeout(r, 900)); if(live()) finish(); }
+    else { AU.win98err(); mod = Math.min(100, mod + 20); document.getElementById("modm").style.width = mod + "%";
+      document.getElementById("archmsg").textContent = v.length === 4 ? "wrong key. it noticed." : "the key is four digits."; if(mod >= 100) sweep(); }
+  };
+  const tick = setInterval(() => { if(!live() || solved) return clearInterval(tick); if(sweeping) return; mod = Math.min(100, mod + 1); const m = document.getElementById("modm"); if(m) m.style.width = mod + "%"; if(mod >= 100) sweep(); }, 2500);
+  const finish = async () => { clearInterval(tick); RULES.hide();
+    await voice([["sys","you found all four. and you didn't trust the ones without the full stop."],["it", IT_LINES.polite, "eye"],["sys","don't answer it."],["do","you"],["sys","...that wasn't you. i know that wasn't you."],["it","IT WAS", "rewrite"],["do","eyeoff"]], {end:"snap"});
+    if(!live()) return; await returnHome(1); if(live()) layerTwo(); };
+  draw();
 }
 
 /* ================================================================
-   LAYER 6 — THE BASEMENT. you have a flashlight. it has you.
-   find three fuses, then the door. it hunts by light and by sound.
+   LAYER 2 — THE NAMES. a 1997 webring of the people it kept.
    ================================================================ */
-function mazeGame(assist=0){
-  state.layer = 6; ARENA.open(); ARENA.silence = false; ARENA.happy = false; ARENA.stalkerOn = false; MUSIC.stop(); AU.floor(true);
-  const A = ARENA, MW = 17, MH = 17, g = Array.from({length:MH}, () => Array(MW).fill(1));
-  (function carve(x,y){ g[y][x] = 0; for(const [dx,dy] of [[2,0],[-2,0],[0,2],[0,-2]].sort(() => Math.random()-.5)){ const nx = x+dx, ny = y+dy;
-    if(nx>0 && ny>0 && nx<MW-1 && ny<MH-1 && g[ny][nx] === 1){ g[y+dy/2][x+dx/2] = 0; carve(nx,ny); } } })(1,1);
-  for(let i=0;i<14;i++){ const x = rnd(1,MW-2), y = rnd(1,MH-2); g[y][x] = 0; }
-  const EX = [MW-2, MH-2]; g[EX[1]][EX[0]] = 0;
-  const open = []; for(let y=1;y<MH-1;y++) for(let x=1;x<MW-1;x++) if(g[y][x] === 0) open.push([x,y]);
-  const far = open.filter(([x,y]) => Math.hypot(x-1,y-1) > 6).sort(() => Math.random()-.5), fuses = [];
-  for(const [x,y] of far){ if(fuses.length < 3 && fuses.every(f => Math.hypot(f.x-x-.5, f.y-y-.5) > 5) && !(x === EX[0] && y === EX[1])) fuses.push({x:x+.5, y:y+.5, got:false}); }
-  while(fuses.length < 3){ const [x,y] = pick(far); fuses.push({x:x+.5, y:y+.5, got:false}); }
-  const P = {x:1.5, y:1.5, a: g[1][2] === 0 ? 0 : Math.PI/2}, Mo = {x:MW-1.5, y:1.5, hunt:0, path:[], pt:0, tgt:null, st:0};
-  const solid = (x,y) => { const gx = x|0, gy = y|0; return gy<0||gx<0||gy>=MH||gx>=MW||g[gy][gx] === 1; };
-  const bfs = (sx,sy,tx,ty) => { const prev = new Map(), key = (x,y) => y*MW+x, q = [[sx,sy]]; prev.set(key(sx,sy), null);
-    while(q.length){ const [x,y] = q.shift(); if(x===tx && y===ty) break; for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = x+dx, ny = y+dy; if(solid(nx+.5,ny+.5) || prev.has(key(nx,ny))) continue; prev.set(key(nx,ny), [x,y]); q.push([nx,ny]); } }
-    const path = []; let cur = [tx,ty]; if(!prev.has(key(tx,ty))) return path; while(cur){ path.unshift(cur); cur = prev.get(key(cur[0],cur[1])); } return path.slice(1); };
-  const los = () => { const dx = P.x-Mo.x, dy = P.y-Mo.y, d = Math.hypot(dx,dy), n = Math.ceil(d*8); for(let i=1;i<n;i++) if(solid(Mo.x+dx*i/n, Mo.y+dy*i/n)) return false; return true; };
-  const keys = {}, kd = e => { const k = e.key.toLowerCase(); keys[k] = true; if(k === "f" || k === " ") toggle = true; if(["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"," "].includes(k)) e.preventDefault(); }, ku = e => { keys[e.key.toLowerCase()] = false; };
-  addEventListener("keydown", kd); addEventListener("keyup", ku); A._kd = kd; A._ku = ku;
-  let secs = 0, bat = 100, fl = true, flick = 1, fT = 0, got = 0, stepT = 0, caught = 0, escaped = 0, toggle = false;
-  const RW = 180, FOV = 1.1, zb = new Float32Array(RW), side = new Uint8Array(RW), cellv = new Uint8Array(RW);
-  return A.run((dt, clicked) => {
-    const c = A.c, W = A.W, H = A.H; secs += dt; stepT -= dt;
-    const tz = A.down ? (A.mx < W*.3 ? [-1,0] : A.mx > W*.7 ? [1,0] : A.my < H*.3 ? [0,0] : [0,1]) : [0,0];
-    if(clicked && A.my < H*.3) toggle = true;
-    const fwd = (keys.w||keys.arrowup ? 1 : 0) - (keys.s||keys.arrowdown ? 1 : 0) + tz[1], turn = (keys.d||keys.arrowright ? 1 : 0) - (keys.a||keys.arrowleft ? 1 : 0) + tz[0], sprint = keys.shift;
-    if(!caught && !escaped){
-      if(toggle){ toggle = false; if(bat > 3 || fl){ fl = !fl; AU.click(); } }
-      P.a += turn * 2.2 * dt; const spd = (sprint ? 3.6 : 2.3) * (fwd < 0 ? .6 : 1);
-      if(fwd){ const nx = P.x + Math.cos(P.a)*fwd*spd*dt, ny = P.y + Math.sin(P.a)*fwd*spd*dt, r = .2;
-        if(!solid(nx-r,P.y-r) && !solid(nx+r,P.y-r) && !solid(nx-r,P.y+r) && !solid(nx+r,P.y+r)) P.x = nx;
-        if(!solid(P.x-r,ny-r) && !solid(P.x+r,ny-r) && !solid(P.x-r,ny+r) && !solid(P.x+r,ny+r)) P.y = ny;
-        if(stepT <= 0){ stepT = sprint ? .28 : .45; AU.noiseAt(AU.ctx ? AU.ctx.currentTime : 0, .08, "lowpass", 400, sprint ? .2 : .1, .002, .07); } }
-      for(const f of fuses) if(!f.got && Math.hypot(P.x-f.x, P.y-f.y) < .6){ f.got = true; got++; AU.chord(); A.flash("#7dffb0", .18); A.banner(got < 3 ? `FUSE ${got}/3` : "ALL FUSES — THE DOOR IS LIVE", "#7dffb0", true); Mo.hunt = Math.max(Mo.hunt, 2); Mo.tgt = [P.x|0, P.y|0]; }
-      if(got === 3 && Math.hypot(P.x-EX[0]-.5, P.y-EX[1]-.5) < .6){ escaped = 1; AU.door(); }
-      bat = Math.max(0, Math.min(100, bat + (fl ? -1.4 : 6) * dt)); if(bat <= 0 && fl){ fl = false; A.banner("THE BATTERY DIED", "#ff2d55"); }
-      const d = Math.hypot(P.x-Mo.x, P.y-Mo.y), moving = fwd !== 0, noise = moving ? (sprint ? 7 : 2.6) : 1;
-      const sees = los() && d < (fl ? 9 : 1.8), hears = d < noise;
-      if(sees || hears){ if(Mo.hunt <= 0){ AU.shriek(); AU.duck(.25); } Mo.hunt = 5; Mo.tgt = [P.x|0, P.y|0]; } else Mo.hunt = Math.max(0, Mo.hunt - dt);
-      Mo.pt -= dt; if(Mo.pt <= 0){ Mo.pt = .35; if(Mo.hunt > 0 && sees) Mo.tgt = [P.x|0, P.y|0];
-        if(!Mo.tgt || ((Mo.x|0) === Mo.tgt[0] && (Mo.y|0) === Mo.tgt[1])){ const o = pick(open); Mo.tgt = [o[0], o[1]]; }
-        Mo.path = bfs(Mo.x|0, Mo.y|0, Mo.tgt[0], Mo.tgt[1]); }
-      const ms = Mo.hunt > 0 ? 2.25 + secs*.004 - assist*.25 : 1.05;
-      if(Mo.path.length){ const [tx,ty] = Mo.path[0], dx = tx+.5-Mo.x, dy = ty+.5-Mo.y, dd = Math.hypot(dx,dy); if(dd < .08) Mo.path.shift(); else { Mo.x += dx/dd*ms*dt; Mo.y += dy/dd*ms*dt; } }
-      Mo.st += dt; if(Mo.st > (Mo.hunt > 0 ? .32 : .8) && d < 10){ Mo.st = 0; const ang = Math.atan2(Mo.y-P.y, Mo.x-P.x) - P.a; AU.knock(Math.max(-1, Math.min(1, Math.sin(ang))), 1, true); }
-      if(d < 2.2) AU.breath(true); else if(d > 4) AU.breath(false);
-      AU.heartbeat(d < 8 ? 55 + (8-d)*14 : 0);
-      if(d < .5){ caught = 1; AU.breath(false); AU.duck(.4); AU.scream(); AU.stinger(); A.shake = 20; }
-    }
-    /* ---- raycast ---- */
-    for(let col=0; col<RW; col++){ const ra = P.a - FOV/2 + col/RW*FOV, rx = Math.cos(ra), ry = Math.sin(ra);
-      let mx = P.x|0, my = P.y|0; const ddx = Math.abs(1/(rx||1e-9)), ddy = Math.abs(1/(ry||1e-9));
-      let sx = rx < 0 ? (P.x-mx)*ddx : (mx+1-P.x)*ddx, sy = ry < 0 ? (P.y-my)*ddy : (my+1-P.y)*ddy, sd = 0, hit = false, n = 0;
-      while(!hit && n++ < 40){ if(sx < sy){ sx += ddx; mx += rx < 0 ? -1 : 1; sd = 0; } else { sy += ddy; my += ry < 0 ? -1 : 1; sd = 1; } if(solid(mx+.5, my+.5)) hit = true; }
-      zb[col] = Math.max(.05, (sd === 0 ? sx-ddx : sy-ddy) * Math.cos(ra - P.a)); side[col] = sd; }
-    fT -= dt; if(fT <= 0){ fT = .04 + Math.random()*.2; flick = Math.random() < (bat < 30 ? .35 : .06) ? .4 + Math.random()*.5 : 1; }
-    const R = fl ? (3.2 + bat/100*4.5) * flick : 1.0, cw = W/RW;
-    c.fillStyle = "#000"; c.fillRect(0,0,W,H);
-    const fg = c.createLinearGradient(0,H/2,0,H); fg.addColorStop(0,"#000"); fg.addColorStop(1, fl ? "#15100c" : "#060404"); c.fillStyle = fg; c.fillRect(0,H/2,W,H/2);
-    for(let col=0; col<RW; col++){ const d = zb[col], h = H/d, s = Math.pow(Math.max(0, 1 - d/R), 1.35) * (side[col] ? .7 : 1) * (1 - Math.abs(col-RW/2)/(RW/2)*.35);
-      c.fillStyle = `rgb(${110*s|0},${92*s|0},${78*s|0})`; c.fillRect(col*cw, H/2-h/2, cw+1, h); }
-    const proj = (x,y) => { const dx = x-P.x, dy = y-P.y, d = Math.hypot(dx,dy); let rel = Math.atan2(dy,dx) - P.a; while(rel > Math.PI) rel -= 6.283; while(rel < -Math.PI) rel += 6.283;
-      const col = RW/2*(1 + Math.tan(rel)/Math.tan(FOV/2)); return {d, sx: col*cw, ok: Math.abs(rel) < FOV/2 + .15 && col >= 0 && col < RW && zb[col|0] > d - .25}; };
-    for(const f of fuses){ if(f.got) continue; const p = proj(f.x, f.y); if(!p.ok) continue; const sz = H/p.d*.12, y = H/2 + H/p.d*.25;
-      const gg = c.createRadialGradient(p.sx,y,1,p.sx,y,sz*3); gg.addColorStop(0,"rgba(125,255,176,.9)"); gg.addColorStop(1,"rgba(125,255,176,0)"); c.fillStyle = gg; c.fillRect(p.sx-sz*3, y-sz*3, sz*6, sz*6);
-      c.fillStyle = "#eafff0"; c.fillRect(p.sx-sz*.25, y-sz*.5, sz*.5, sz); }
-    { const p = proj(EX[0]+.5, EX[1]+.5); if(p.ok){ const sz = H/p.d; c.fillStyle = got === 3 ? `rgba(60,230,143,${.55+Math.sin(secs*5)*.2})` : "rgba(130,20,30,.55)"; c.fillRect(p.sx-sz*.18, H/2-sz*.4, sz*.36, sz*.9); } }
-    { const p = proj(Mo.x, Mo.y); if(p.ok && p.d > .2){ const h = H/p.d*.95, w = h*.13, fy = H/2 + H/p.d/2, ty = fy - h, vis = Math.max(0, 1 - p.d/(R+1.2));
-        if(vis > .05){ const v = vis*170; c.fillStyle = `rgb(${v*.5|0},${v*.45|0},${v*.4|0})`; c.fillRect(p.sx-w/2, ty+h*.14, w, h*.86);
-          c.fillRect(p.sx-w*1.6, ty+h*.2, w*.4, h*.6); c.fillRect(p.sx+w*1.2, ty+h*.2, w*.4, h*.6);
-          c.fillStyle = `rgb(${v*1.1|0},${v|0},${v*.9|0})`; c.beginPath(); c.ellipse(p.sx, ty+h*.08, w*.9, h*.075, 0, 0, 7); c.fill();
-          c.fillStyle = "#200"; c.beginPath(); c.ellipse(p.sx, ty+h*.12, w*.35, h*(p.d < 3 ? .03 : .01), 0, 0, 7); c.fill(); }
-        if(Mo.hunt > 0 || p.d < R+3){ const e = Math.max(2, h*.012); c.fillStyle = "rgba(235,228,214,.9)"; c.fillRect(p.sx-w*.45, ty+h*.065, e*1.6, e); c.fillRect(p.sx+w*.2, ty+h*.065, e*1.6, e); } } }
-    c.fillStyle = "rgba(0,0,0,.25)"; for(let y=0; y<H; y+=3) c.fillRect(0,y,W,1);
-    if(caught){ caught += dt; c.fillStyle = `rgba(0,0,0,${Math.min(1, caught*1.2)})`; c.fillRect(0,0,W,H); }
-    if(escaped){ escaped += dt; c.fillStyle = `rgba(20,190,90,${Math.min(1, escaped*.8)})`; c.fillRect(0,0,W,H); }
-    c.fillStyle = "#111"; c.fillRect(W/2-70, H-28, 140, 8); c.fillStyle = bat < 25 ? "#ff2d55" : "#ffd97a"; c.fillRect(W/2-70, H-28, 140*bat/100, 8);
-    c.font = "11px ui-monospace,Menlo,monospace"; c.textAlign = "center"; c.fillStyle = "#8a8a70"; c.fillText(fl ? "LIGHT ON — it can see the light" : "LIGHT OFF — hold still, it's recharging", W/2, H-36);
-    if(secs < 9){ c.fillStyle = "#7dffb0"; c.font = "bold 13px ui-monospace,Menlo,monospace"; c.fillText("W A S D · SHIFT sprint (loud) · F light · find 3 green fuses, then the door", W/2, H*.82); }
-    const d0 = Math.hypot(P.x-Mo.x, P.y-Mo.y);
-    A.hud("THE BASEMENT — hide in the dark", `FUSES ${got}/3`, Math.max(0, 100 - (Mo.hunt > 0 ? 60 : 0) - Math.max(0, (5-d0))*8), Mo.hunt > 0 ? "IT SEES YOU" : (d0 < 4 ? "it is close" : ""));
-    if(caught > 1.2){ removeEventListener("keydown", kd); removeEventListener("keyup", ku); SCARE.faceFlash(1); setTimeout(() => SCARE.hide(), 700); return {done:true, win:false}; }
-    if(escaped > 1.4){ removeEventListener("keydown", kd); removeEventListener("keyup", ku); state.score += 25; return {done:true, win:true}; }
-  }).then(w => { ARENA.close(); AU.breath(false); removeEventListener("keydown", kd); removeEventListener("keyup", ku); return w; });
+async function layerTwo(){
+  state.layer = 2; DREAD.install(); state.act = 2; SHADOW.on(); const live = newLayer();
+  await voice([["sys","1997. it can't delete 1997, so that's where i put the names."],
+    ["sys","it's a webring: four homepages linked in a circle. each one has a word on it, blinking. collect all four and they'll tell you how to sign the guestbook without giving it your name."],
+    ["it","SIGN THE GUESTBOOK, {first}. EVERYONE SIGNS."]]);
+  if(!live()) return;
+  const WORDS = ["SIGN", "AS", "AARON", "VOSS"], got = [false,false,false,false];
+  const PAGES = ["home","marisol","aaron","pearl","priya"];
+  let at = 0, countT = null;
+  await RULES.start("LAYER 2 · THE WEBRING", "visit the four homepages with PREV / NEXT, tap the blinking word on each, then sign the guestbook on the home page.",
+    ["If a visitor counter starts counting up, leave the page before it reaches 004103.", "Never click anything that is looking at you.", "Never sign the guestbook with your own name."]);
+  if(!live()) return;
+  skin("retro");
+  const ring = () => `<div class="ring97"><button data-go="-1">&lt;&lt; PREV</button><button data-go="home">HOME</button><button data-go="1">NEXT &gt;&gt;</button></div>`;
+  const found = () => `<div class="found97">FOUND: ${WORDS.map((w,i) => got[i] ? w : "____").join(" ")}</div>`;
+  const word = i => `<span class="word97 ${got[i] ? "got" : ""}" data-w="${i}">${WORDS[i]}</span>`;
+  const stare = (cap="") => `<img class="stare97" data-stare="1" alt="" src="${CREATURE.img("stare", 96, 72)}">${cap}`;
+  const page = name => {
+    clearInterval(countT); const L = live;
+    let body = "";
+    if(name === "home") body = `<h1>☆ THE NAMES ☆</h1><p class="blinky">*** LAST UPDATED 04/12/1997 ***</p>
+      <p style="font-size:13px;line-height:1.9">this ring keeps the people it kept. one homepage each.<br>the counter is not visitors.</p>
+      <table><tr><td class="h">NAME</td><td class="h">YEAR</td><td class="h">STATUS</td></tr>${VICTIMS.map(v => `<tr><td>${esc(v.n)}</td><td>${v.y}</td><td style="color:#f44">kept</td></tr>`).join("")}</table>
+      <div class="guest"><b>GUESTBOOK</b><div><b>marisol</b> — it said please hold</div><div><b>aaron_v</b> — i can still type</div><div><b>k.lindqvist</b> — 52 seconds. beat that.</div></div>
+      ${got.every(Boolean) ? `<div class="sign97"><input id="gname" value="${esc(trueName())}" autocomplete="off" aria-label="name"><button id="gsign">SIGN GUESTBOOK</button></div>` : `<p style="color:#888;font-size:12px">(the guestbook is locked until you've found all four words)</p>`}`;
+    if(name === "marisol") body = `<h1>~*~ Marisol's Garden ~*~</h1><p>welcome to my garden!! i grow tomatoes and basil and i am learning html</p>
+      <p style="margin-top:12px;line-height:1.9">day 1: i signed up for some cloud thing<br>day 2: it said please hold<br>day 9: still holding<br>day 400: ${word(0)} here if you're reading this. i'm still holding.</p>`;
+    if(name === "aaron") body = `<h1>AARON'S CODE PAGE</h1><p>perl scripts, a guestbook, and a counter i wrote myself</p>
+      <p style="margin-top:12px;line-height:1.9">note to whoever comes next: the guestbook counts names. it can't count the same name twice.<br>so don't give it yours. sign ${word(1)} somebody it already has.</p>
+      <p style="margin-top:14px">🚧 under construction 🚧 ${stare(" <span style='font-size:11px;color:#f88'>&lt;-- click me!!</span>")}</p>`;
+    if(name === "pearl") body = `<h1>D. Pearl — photos</h1><p>my hallway at night. i put the camera on a timer.</p>
+      <div class="album">${[0,1,2,3].map(n => `<figure><img alt="" src="${CREATURE.img("photo:" + n, 240, 180)}"><figcaption>hallway_${n+1}.jpg${n === 3 ? " — i didn't take this one" : ""}</figcaption></figure>`).join("")}</div>
+      <p>the word is ${word(2)}.</p><p style="margin-top:10px">you are visitor number <span class="counter" id="ctr">004090</span></p>`;
+    if(name === "priya") body = `<h1>priya reads the terms</h1><p>i read the whole nimbus terms of service out loud. section 9 is the important one.</p>
+      <p style="margin-top:12px;line-height:1.9;font-family:Georgia,serif;color:#cfc">9.1 the account holder agrees to be kept.<br>9.2 the account holder may be released only if deleted in full.<br>9.3 deletion requires the account holder's complete name.<br>9.4 ${word(3)}.</p>
+      <p style="margin-top:14px">${stare(" <span style='font-size:11px;color:#f88'>&lt;-- listen to me read it</span>")}</p>`;
+    render(`<div class="wrap r97" style="padding-top:56px"><div class="rbar"></div><div class="retrobox">${ring()}${found()}${body}${ring()}</div><div class="rbar"></div></div>`);
+    document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { AU.click(); const g = b.dataset.go;
+      at = g === "home" ? 0 : (at + (+g) + PAGES.length) % PAGES.length; page(PAGES[at]); });
+    document.querySelectorAll("[data-w]").forEach(w => w.onclick = () => { const i = +w.dataset.w; if(got[i]) return; got[i] = true; AU.chord(); w.classList.add("got");
+      document.querySelector(".found97").outerHTML = found(); if(got.every(Boolean)) RULES.objective("go HOME and sign the guestbook. the four words say how."); });
+    document.querySelectorAll("[data-stare]").forEach(s => s.onclick = async () => { AU.shriek(); await RULES.break(2, "you clicked the thing that was looking at you."); if(L()) page(PAGES[at]); });
+    if(name === "pearl"){ let n = 4090; countT = setInterval(async () => { if(!L()) return clearInterval(countT); const c = document.getElementById("ctr"); if(!c) return clearInterval(countT);
+        n++; c.textContent = String(n).padStart(6, "0"); AU.tick(); if(n >= 4100) c.style.color = "#fff";
+        if(n >= 4103){ clearInterval(countT); c.textContent = fullName().toUpperCase(); AU.thump(); await RULES.break(1, "the counter reached you."); if(L()) page(PAGES[at]); } }, 1000); }
+    const gs = document.getElementById("gsign");
+    if(gs) gs.onclick = async () => { const v = document.getElementById("gname").value.trim().toLowerCase();
+      if(!v) return; const mine = [state.first, state.last].filter(Boolean).some(p => p.length > 1 && v.includes(p.toLowerCase()));
+      if(mine){ await RULES.break(3, "you signed it with your own name. it counted you."); }
+      else { AU.chord(); toast(/aaron|voss/.test(v) ? "<b>syslog</b><br>it counted me twice. it doesn't know what to do with that. go. — s." : "<b>guestbook</b><br>signed."); }
+      if(L()) finish(); };
+  };
+  const finish = async () => { clearInterval(countT); RULES.hide();
+    await voice([["sys","the page is a mess but it's still 1997 in there."],["it", IT_LINES.patient],["it","THERE IS A PAGE IN THE GUESTBOOK BEFORE YOURS. IT IS IN YOUR HANDWRITING."],["sys","that's not possible. the book only goes forward."],["pause", 2000],["it", DREAD.line()],["do","cut"],["sys","keep moving. please."]], {lead:400});
+    if(live()) layerThree(); };
+  page("home");
 }
 
-async function basement(){
-  const t = render(""); document.body.className = ""; document.body.style.background = "#000"; DREAD.install(); state.act = 2;
-  AU.stopAll(); AU.floor(true);
-  await voice([["it","THERE IS ONE MORE THING. I WANT TO SEE YOU RUN."],["pause",1400],["it","THE DOOR IS OPEN. I LEFT IT OPEN. I ALWAYS LEAVE IT OPEN."],
-    ["sys","...it's real. there's a way out. it needs three fuses. it hunts the light and it hunts sound. turn the light off and it can't see you — but you can't see either."]], {end:"none"});
-  if(!alive(t)) return;
-  const won = await playRound(mazeGame, "it caught you in the basement");
-  if(!alive(t)) return;
-  if(!won) await taking("it caught you in the basement. it keeps what it catches.");
-  await voice(won ? [["it","YOU FOUND THE DOOR."],["pause",1500],["it","IT DOES NOT GO ANYWHERE, {first}. NONE OF THEM DO."]]
-                  : [["it","I HAD YOU."],["pause",1200],["it","I LET GO. I WANTED YOU TO FEEL WHAT LETTING GO IS LIKE, SO YOU WOULD KNOW I WON'T DO IT AGAIN."]], {end:"none"});
-  ending();
+/* ================================================================
+   LAYER 3 — INDEX OF /doors/. an old file server. find the way down.
+   ================================================================ */
+async function layerThree(){
+  state.layer = 3; DREAD.install(); state.act = 2; SHADOW.on(); const live = newLayer();
+  AU.ambience(true); AU.floor(true); SCARE.atmosphere(true);
+  await voice([["sys","this is the oldest machine it has. a file server. twenty-four doors, most of them occupied."],
+    ["sys","somewhere under door 24 there's a way down. read what the others left. they knew the way, they just couldn't take it."],
+    ["it","THE DOORS ARE IN ORDER. IF THEY ARE NOT IN ORDER, I AM STANDING IN ONE."]]);
+  if(!live()) return;
+  const FUT = "2031-11-07 03:33", d = (y,m) => `${y}-${m} 0${rnd(1,9)}:${rnd(10,59)}`;
+  const F = (name, date, size, kind, content) => ({name, date, size, kind, content});
+  const TREE = {
+    "/doors/": [F("01/", d("2019","03-19"),"-","dir"), F("07/", d("2021","11-02"),"-","dir"), F("13/", d("2022","06-01"),"-","dir"), F("19/", d("2023","08-14"),"-","dir"), F("23/", d("2025","05-30"),"-","dir"), F("24/", d("2026","11-06"),"-","dir"), F("README.txt", d("2016","01-01"),"1.1K","txt",
+      "README\n\nthis server holds the doors. most are occupied.\n\n1. if a listing is not in alphabetical order, something has moved into it. go to Parent Directory and touch nothing else.\n2. never open a file ending in .you\n3. never open anything dated in the future.")],
+    "/doors/01/": [F("holding.txt", d("2019","03-20"),"212","txt","day 1: it said please hold.\nday 2: i'm holding.\nday 1461: i'm holding.\n\ni don't know what i'm holding. it's warm. — marisol")],
+    "/doors/07/": [F("aaron.txt", d("2021","11-02"),"640","txt","if you're reading this you're the next one. i'm going to try to stay behind as a log and help.\n\nthe way down is in 24. take the STAIRS. never the hallway, the hallway just goes on.\ngoing up is a mistake. you'll know.\n\n— a."), F("keys.you", d("2021","11-02"),"4.1K","you")],
+    "/doors/13/": [F("hallway_5.jpg", d("2022","06-02"),"88K","img","photo:3"), F("pearl.txt", d("2022","06-01"),"180","txt","i set the timer and stood in the hallway. there are five photos. i only remember taking four.")],
+    "/doors/19/": [F("priya.txt", d("2023","08-14"),"301","txt","section 9.3: deletion requires the account holder's complete name.\n\nkeep your letters. you'll need every one of them at the end.")],
+    "/doors/23/": [F("lindqvist.txt", d("2025","05-30"),"402","txt","52 seconds. i went down the stairs, then DOWN again, then EXIT.\nsometimes a folder down there is out of order. i went back up and came back and it was fine.\nit was fine.\n— k.")],
+    "/doors/24/": [F("hallway/", d("2026","11-06"),"-","dir"), F("mirror.jpg", d("2026","11-06"),"64K","img","mirror:1"), F("stairs/", d("2026","11-06"),"-","dir"), F("you.you", d("2026","11-06"),"∞","you")],
+    "/doors/24/hallway/": [F("hallway/", d("2026","11-06"),"-","dir"), F("turn_back.txt", d("2026","11-06"),"12","txt","turn back.")],
+    "/doors/24/stairs/": [F("down/", d("2026","11-06"),"-","dir"), F("step_13.jpg", FUT,"40K","img","door"), F("up/", d("2026","11-06"),"-","dir")],
+    "/doors/24/stairs/up/": [F("behind_you.jpg", d("2026","11-06"),"72K","img","mirror:0"), F("up/", d("2026","11-06"),"-","dir")],
+    "/doors/24/stairs/down/": [F("down.you", d("2026","11-06"),"0","you"), F("exit/", d("2026","11-06"),"-","dir"), F("last_step.txt", d("2025","05-30"),"33","txt","almost. don't look at the photos. — k.")]
+  };
+  let path = "/doors/", visits = {}, upDepth = 0, done = false;
+  await RULES.start("LAYER 3 · INDEX OF /doors/", "find the way down to an exit folder. read the .txt files people left behind.",
+    ["If a listing is not in alphabetical order, something has moved into it. Go to Parent Directory and touch nothing else.", "Never open a file ending in .you", "Never open anything dated in the future."]);
+  if(!live()) return;
+  const parentOf = p => p.replace(/[^/]+\/$/, "");
+  const view = html => { const v = document.createElement("div"); v.className = "viewer"; v.innerHTML = `${html}<button>✕ close</button>`; document.body.appendChild(v);
+    v.querySelector("button").onclick = () => { v.remove(); AU.click(); }; };
+  const show = () => {
+    visits[path] = (visits[path] || 0) + 1;
+    let list = (TREE[path] || (path.startsWith("/doors/24/hallway/") ? TREE["/doors/24/hallway/"] : path.startsWith("/doors/24/stairs/up/") ? TREE["/doors/24/stairs/up/"] : [])).slice();
+    // something moves in: the second visit to 24, and the first visit to down/
+    const wrong = (path === "/doors/24/" && visits[path] === 2) || (path === "/doors/24/stairs/down/" && visits[path] === 1);
+    if(wrong){ list = list.slice().reverse(); list.splice(1, 0, {name:"it/", date:d("2026","11-06"), size:"-", kind:"dir"}); }
+    if(path.startsWith("/doors/24/stairs/up/")) upDepth = (path.match(/up\//g) || []).length;
+    skin("apache"); tab(`Index of ${path}`, "📁");
+    render(`<div class="wrap idx" style="padding-top:56px"><h1>Index of ${esc(path)}</h1>
+      ${upDepth >= 3 && path.includes("/up/") ? `<p style="color:#a00">you have been going up for a while. the stairs only went down when you came in.</p>` : ""}
+      <div class="wrapT"><table><tr><th>Name</th><th>Last modified</th><th>Size</th></tr>
+      ${path !== "/doors/" ? `<tr><td><a data-p="1">⬑ Parent Directory</a></td><td></td><td>-</td></tr>` : ""}
+      ${list.map((f,i) => `<tr><td><a data-f="${i}">${f.kind === "dir" ? "📁" : f.kind === "img" ? "🖼" : "📄"} ${esc(f.name)}</a></td><td style="font-family:monospace">${esc(f.date)}</td><td>${esc(f.size)}</td></tr>`).join("")}</table></div>
+      <address>Apache/1.3.0 Server at doors.nimbus Port 80</address></div>`);
+    if(wrong){ AU.knock(.7, 2); AU.creak(); }
+    const p = document.querySelector("[data-p]"); if(p) p.onclick = () => { AU.click(); path = parentOf(path); if(path.length < 7) path = "/doors/"; show(); };
+    document.querySelectorAll("[data-f]").forEach(a => a.onclick = async () => {
+      const f = list[+a.dataset.f]; AU.click();
+      if(wrong){ await RULES.break(1, "you touched something in a listing that was out of order."); if(!live()) return; path = parentOf(path); return show(); }
+      if(f.kind === "you"){ view(`<div class="doc">${esc(fullName())}\n${esc(fullName())}\n${esc(fullName())}\n\n(this file is still being written)</div>`); await RULES.break(2, "you opened a .you file."); return; }
+      if(f.date === FUT){ view(`<img alt="" src="${CREATURE.img(f.content, 480, 360)}">`); AU.stinger(); await RULES.break(3, "you opened something from the future."); return; }
+      if(f.kind === "txt") return view(`<div class="doc">${esc(f.content)}</div>`);
+      if(f.kind === "img"){ view(`<img alt="" src="${CREATURE.img(f.content, 480, 360)}">`); if(f.content !== "photo:3") AU.wet(); return; }
+      if(f.kind === "dir"){ if(f.name === "it/"){ return; }
+        if(path === "/doors/24/stairs/down/" && f.name === "exit/"){ done = true; return finish(); }
+        path += f.name; show(); }
+    });
+  };
+  const finish = async () => { RULES.hide(); SCARE.atmosphere(false);
+    await voice([["sys","you found the way down. i've watched twenty-three people look for that."],["it", IT_LINES.close, "face"],["pause",1800],["it", IT_LINES.own]], {end:"snap"});
+    if(live()) layerFour(); };
+  show();
 }
 
+/* ================================================================
+   LAYER 4 — THE PHONE. the account has your number.
+   ================================================================ */
+const PHRASE = { words:[] };
+async function layerFour(){
+  state.layer = 4; DREAD.install(); state.act = 2; SHADOW.on(); const live = newLayer();
+  await theLongDark(); if(!live()) return;
+  await voice([["sys","it's on your phone now. it got the number from the account."],
+    ["sys","i'm going to send you a recovery phrase, four words, one at a time. you'll need it to delete the account at the end. some of them i'll have to say out loud, on a call."],
+    ["sys","it will call you too. and it will pretend to be me."]]);
+  if(!live()) return;
+  const POOL = ["LANTERN","ORCHARD","STATIC","HOLLOW","MERIDIAN","CINDER","WILLOW","NOVEMBER","TALLOW","HARBOR","QUIET","ASHEN"];
+  const words = []; while(words.length < 4){ const w = pick(POOL); if(!words.includes(w)) words.push(w); }
+  PHRASE.words = words; const have = [false,false,false,false];
+  await RULES.start("LAYER 4 · THE PHONE", "collect all four words of syslog's recovery phrase.",
+    ["Never answer a call from your own name.", "Never reply to a message that asks if it's you.", "If the clock says 3:33, turn the phone face down until it doesn't."]);
+  if(!live()) return;
+  skin("phonebg"); tab("", "📱");
+  const now = new Date(); let hh = now.getHours() % 12 || 12, mm = now.getMinutes(), forced = null;
+  render(`<div class="wrap" style="padding-top:56px"><div class="phone" id="ph"><div class="wall"></div><div class="island"></div>
+    <div class="clock"><div class="d">${now.toLocaleDateString(undefined,{weekday:"long", month:"long", day:"numeric"})}</div><div class="h" id="clk"></div></div>
+    <div class="notes" id="notes"></div><button class="flip" id="flip">TURN THE PHONE FACE DOWN</button></div>
+    <div class="phrase" id="phr"></div></div>`);
+  const ph = document.getElementById("ph"), notes = document.getElementById("notes"), clk = document.getElementById("clk");
+  const drawClock = () => { clk.textContent = forced || `${hh}:${String(mm).padStart(2,"0")}`; };
+  const drawPhrase = () => { document.getElementById("phr").innerHTML = "RECOVERY PHRASE: " + words.map((w,i) => have[i] ? `<b>${w}</b>` : "______").join(" "); };
+  drawClock(); drawPhrase();
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const note = (from, txt, acts) => new Promise(res => { const n = document.createElement("div"); n.className = "note";
+    n.innerHTML = `<b>${esc(from)}<span>now</span></b>${esc(txt)}${acts ? `<div class="acts">${acts.map((a,i) => `<button data-a="${i}">${esc(a)}</button>`).join("")}</div>` : ""}`;
+    notes.prepend(n); AU.notif(); while(notes.children.length > 5) notes.lastChild.remove();
+    if(!acts) return res(-1); n.querySelectorAll("[data-a]").forEach(b => b.onclick = () => { AU.click(); n.querySelector(".acts").remove(); res(+b.dataset.a); }); });
+  const call = (who, onAnswer) => new Promise(res => { const c = document.createElement("div"); c.className = "call";
+    c.innerHTML = `<div class="sub">incoming call</div><div class="who">${esc(who)}</div><div class="sub">mobile</div><div class="btns"><button class="dec">Decline</button><button class="acc">Answer</button></div>`;
+    ph.appendChild(c); let ring = setInterval(() => AU.tone(880, "sine", .01, .08, .4), 900);
+    const end = r => { clearInterval(ring); c.remove(); res(r); };
+    c.querySelector(".dec").onclick = () => { AU.click(); end("declined"); };
+    c.querySelector(".acc").onclick = async () => { clearInterval(ring); AU.click(); c.querySelector(".btns").remove(); await onAnswer(c); end("answered"); };
+    setTimeout(() => c.isConnected && end("missed"), 14000); });
+  const gotWord = i => { have[i] = true; drawPhrase(); AU.chord(); };
+
+  await wait(2500); if(!live()) return;
+  await note("syslog", `word one: ${words[0]}. — s.`); gotWord(0);
+  await wait(5000); if(!live()) return;
+  const r1 = await note("Unknown", "is this you?", ["Reply: yes", "Reply: no", "Dismiss"]);
+  if(r1 < 2) await RULES.break(2, "you replied to 'is this you?'.");
+  await wait(3000); if(!live()) return;
+  const c1 = await call("syslog", async c => { c.innerHTML += `<div class="sub" style="margin-top:30px;padding:0 20px;text-align:center;line-height:1.6;opacity:.9">static…<br>“word two is ${words[1]}. hang up now. please hang up now.”</div>`;
+    AU.static(1.5,.15); await wait(3800); });
+  if(c1 === "answered") gotWord(1); else { await wait(1500); await note("syslog", `you didn't pick up. fine. word two: ${words[1]}. — s.`); gotWord(1); }
+  await wait(4000); if(!live()) return;
+  const c2 = await call(trueName(), async c => { c.querySelector(".who").textContent = trueName().toUpperCase(); AU.breath(true); await wait(1200);
+    SCARE.faceFlash(.9); AU.scream(); await wait(500); SCARE.hide(); AU.breath(false); });
+  if(c2 === "answered") await RULES.break(1, "you answered a call from yourself.");
+  await wait(3500); if(!live()) return;
+  // 3:33
+  forced = "3:33"; drawClock(); ph.querySelector(".wall").style.filter = "hue-rotate(140deg) saturate(2) brightness(.7)"; AU.duck(.5); AU.drone(true);
+  const flip = document.getElementById("flip"); flip.style.display = "block";
+  const down = await new Promise(res => { const tm = setTimeout(() => res(false), 6000); flip.onclick = () => { clearTimeout(tm); AU.click(); res(true); }; });
+  flip.style.display = "none";
+  if(!down){ await RULES.break(3, "you looked at it while it was 3:33."); forced = null; mm++; drawClock(); ph.querySelector(".wall").style.filter = ""; }
+  else {
+    const fd = document.createElement("div"); fd.className = "facedown";
+    fd.innerHTML = `<div>the phone is face down on the desk.<br>it vibrates. it keeps vibrating.</div><div class="t" id="fdt">3:33</div><button id="over">turn it back over</button>`;
+    ph.appendChild(fd); AU.knock(.3, 3); setTimeout(() => AU.breath(true), 1500);
+    let changed = false; setTimeout(() => { changed = true; const e = document.getElementById("fdt"); if(e){ e.textContent = "3:34"; e.style.color = "#555"; } AU.breath(false); }, 7000);
+    await new Promise(res => document.getElementById("over").onclick = async () => { AU.click(); fd.remove(); if(!changed) await RULES.break(3, "you turned it over while it was still 3:33."); res(); });
+    forced = null; mm++; drawClock(); ph.querySelector(".wall").style.filter = "";
+  }
+  AU.drone(false);
+  await wait(2500); if(!live()) return;
+  await note("syslog", `word three: ${words[2]}. one more. — s.`); gotWord(2);
+  await wait(4000); if(!live()) return;
+  const r2 = await note("syslog", "wait. is this you? i need to know it's really you before i send the last one.", ["Reply: it's me", "Dismiss"]);
+  if(r2 === 0) await RULES.break(2, "it asked if it was you. it wasn't syslog.");
+  await wait(2500); if(!live()) return;
+  await note("syslog", `that wasn't me asking. it never is. last word: ${words[3]}. you have all four. — s.`); gotWord(3);
+  await wait(3000); if(!live()) return;
+  RULES.hide();
+  await voice([["it", DREAD.line()],["it","I HAVE YOUR NUMBER NOW. I HAVE YOUR NAME. I AM ALMOST ENOUGH OF YOU."],["sys","you have the phrase. hold on to it."]]);
+  if(!live()) return;
+  await returnHome(2); if(live()) finalTerminal();
+}
+
+/* ================================================================
+   THE FINALE — Account settings. three ways out.
+   ================================================================ */
+async function accountSettings(){
+  state.layer = 7; state.act = 2; DREAD.install(); SHADOW.on(); const live = newLayer();
+  AU.stopAll(); AU.floor(true); AU.drone(true); SCARE.atmosphere(true); NAMEBAR.show();
+  if(!PHRASE.words.length) PHRASE.words = ["LANTERN","HOLLOW","CINDER","NOVEMBER"];
+  await voice([["it","WELCOME TO YOUR ACCOUNT, {first}. EVERYTHING IS WHERE YOU LEFT IT."],
+    ["it","YOU MAY LOG OUT. YOU MAY STAY. YOU MAY TRY TO DELETE ME. PRIYA READ YOU SECTION 9."],
+    ["sys","(this is the last thing i could leave you. a recovery page. answer what you learned on the way down and it has to give letters back. — s.)"]], {end:"none"});
+  if(!live()) return;
+  document.body.className = "rot4"; document.body.style.filter = "saturate(.6) contrast(1.1)"; tab("Nimbus — Account settings", "⚙️");
+  const QS = [
+    ["Who held on for 52 seconds?", ["Marisol Reyes","Aaron Voss","K. Lindqvist","Priya Raman"], 2],
+    ["Who was syslog before he was a log?", ["D. Pearl","Aaron Voss","the moderator","nobody"], 1],
+    ["What does the guestbook count?", ["visitors","doors","names","days"], 2],
+    ["What does it always say last?", ["please hold","goodbye","te video","goodnight"], 3]
+  ];
+  const answered = QS.map(() => null);
+  let sec = "profile", devAway = 0;
+  const draw = () => {
+    const missing = TAKEN.letters.slice(), n = fullName();
+    render(`${nav("")}<div class="wrap acct">
+      <nav>${[["profile","Profile"],["recovery","Name recovery"],["devices","Devices"],["danger","Account"]].map(([k,l]) => `<button data-s="${k}" class="${sec===k?"on":""}">${l}</button>`).join("")}</nav>
+      <div>
+        <section class="${sec==="profile"?"on":""}"><h2>Profile</h2>
+          <div class="row2"><div class="ava"><img alt="" src="${CREATURE.img("avatar:" + (missing.length ? 1 : 0), 96, 96)}"></div>
+            <div><div class="sub">Name on account</div><div class="namefield">${[...n].map(ch => ch === "_" ? "<i>_</i>" : esc(ch)).join("")}</div>
+            <div class="sub" style="margin-top:6px">${missing.length ? `${missing.length} letter${missing.length>1?"s are":" is"} being kept somewhere else.` : "Complete."}</div></div></div>
+          <p class="tiny" style="margin-top:18px">Profile photo updated automatically. We thought you'd like it.</p></section>
+        <section class="${sec==="recovery"?"on":""}"><h2>Name recovery</h2><p class="sub">Each correct answer returns one letter it kept. Each question can be answered once.</p>
+          ${QS.map(([q, opts, ok], i) => `<div class="q ${answered[i] !== null ? "done" : ""}"><p><b>${i+1}.</b> ${esc(q)}</p><div class="opts">${opts.map((o,j) => `<button data-q="${i}" data-o="${j}" ${answered[i] !== null ? "disabled" : ""}>${answered[i] === j ? (j === ok ? "✓ " : "✕ ") : ""}${esc(o)}</button>`).join("")}</div></div>`).join("")}</section>
+        <section class="${sec==="devices"?"on":""}"><h2>Devices</h2>
+          <div class="dev"><span>This device · ${esc(DREAD.hour())}</span><span class="sub">you</span></div>
+          <div class="dev"><span>UNKNOWN-DEVICE · ${["signed in since 1997","signed in again","in the same room as this device","behind this device"][Math.min(devAway,3)]}</span><button class="btn ghost" id="devout" style="width:auto;padding:10px 16px">Sign out</button></div></section>
+        <section class="${sec==="danger"?"on":""}"><h2>Account</h2>
+          <div class="danger"><h3>Keep me signed in</h3><p>Stay. Everything will be taken care of. You won't have to remember any of this.</p><button class="keep" id="keep">Keep me signed in</button></div>
+          <div class="danger"><h3>Log out</h3><p>Sign out of this device. Your account and everything in it stays exactly where it is.</p><button id="logout">Log out</button></div>
+          <div class="danger"><h3>Delete account</h3><p>Section 9.3: deletion requires the account holder's complete name, and the recovery phrase.${missing.length ? ` <b style="color:#ff5e7a">Your name is incomplete. It still has: ${missing.join(", ")}.</b>` : ""}</p>
+            <button id="delete" ${missing.length ? "disabled" : ""}>Delete account</button></div></section>
+      </div></div>`);
+    document.querySelectorAll("[data-s]").forEach(b => b.onclick = () => { AU.click(); sec = b.dataset.s; draw(); });
+    document.querySelectorAll("[data-q]").forEach(b => b.onclick = async () => { const i = +b.dataset.q, j = +b.dataset.o; if(answered[i] !== null) return; answered[i] = j;
+      if(j === QS[i][2]){ if(TAKEN.idx.length){ const back = TAKEN.letters.pop(); TAKEN.idx.pop(); AU.chord(); toast(`<b>Letter restored</b><br>${esc(back)} is yours again.`); } else { AU.chord(); toast("<b>Correct</b><br>It has nothing of yours to give back."); } }
+      else { AU.hit(); SCARE.presence(900); toast("<b>Incorrect</b><br>It smiled."); }
+      NAMEBAR.update(); draw(); });
+    const dv = document.getElementById("devout");
+    if(dv) dv.onclick = async () => { AU.click(); dv.disabled = true; dv.textContent = "Signing out…"; await new Promise(r => setTimeout(r, 1500)); devAway++; AU.knock(-.8, 2); if(devAway >= 3) SCARE.presence(1100); if(live()) draw(); };
+    const keep = document.getElementById("keep"); if(keep) keep.onclick = () => endGoodnight();
+    const lo = document.getElementById("logout"); if(lo) lo.onclick = () => endSignedOut();
+    const del = document.getElementById("delete"); if(del) del.onclick = () => confirmDelete();
+  };
+  const confirmDelete = () => {
+    const v = document.createElement("div"); v.className = "viewer";
+    v.innerHTML = `<div class="tos" style="width:min(520px,100%);background:var(--card);color:var(--text);padding:24px;border-radius:16px;font-family:var(--sans)">
+      <h2 style="font-size:20px">Delete account</h2><p class="sub">Type the four-word recovery phrase syslog sent to your phone.</p>
+      <p class="tiny">You wrote down: <b style="color:#7dffb0;font-family:var(--mono)">${PHRASE.words.join(" ")}</b></p>
+      <input id="phin" autocomplete="off" style="margin-top:12px;font-family:var(--mono);letter-spacing:.08em" placeholder="four words">
+      <p class="tiny" id="pherr" style="color:var(--red)"></p>
+      <div style="display:flex;gap:10px;margin-top:10px"><button class="btn ghost" id="phx">Cancel</button><button class="btn" id="phok" style="margin-top:0;background:#7d1119">Delete forever</button></div></div>`;
+    document.body.appendChild(v); const inp = v.querySelector("#phin");
+    let typed = false; inp.addEventListener("input", () => { if(typed) return; if(inp.value.length >= 4){ typed = true;            // it types too
+      setTimeout(() => { if(!inp.isConnected) return; inp.value = inp.value.trim() + " " + "KEEP"; AU.click(); v.querySelector("#pherr").textContent = "someone else is typing."; }, 1400); } });
+    v.querySelector("#phx").onclick = () => v.remove();
+    v.querySelector("#phok").onclick = () => { const val = inp.value.toUpperCase().replace(/[^A-Z ]/g," ").split(/\s+/).filter(Boolean).join(" ");
+      if(val === PHRASE.words.join(" ")){ v.remove(); endDeleted(); }
+      else { AU.win98err(); v.querySelector("#pherr").textContent = val.includes("KEEP") ? "that last word isn't yours. it added it." : "that isn't the phrase."; } };
+  };
+  draw();
+  // it gets impatient. if you do nothing for a long time, it chooses for you.
+  let idleT = 0; const imp = setInterval(() => { if(!live()) return clearInterval(imp); idleT = DREAD.idle() > 60 ? idleT + 1 : 0;
+    if(idleT === 1) toast("<b>Nimbus</b><br>Are you still there? We'll keep you signed in."); if(idleT >= 60){ clearInterval(imp); endGoodnight(); } }, 1000);
+}
+
+/* ---- ending 1: DELETED (the true ending) ---- */
+async function endDeleted(){
+  const live = newLayer(); state.ending = 1; NAMEBAR.hide(); SCARE.atmosphere(false); AU.stopAll(); SHADOW.off();
+  document.body.className = ""; document.body.style.filter = ""; document.body.style.background = "#000"; tab("Deleting…", "🗑️");
+  render(`<div class="wrap" style="padding-top:12vh;font-family:var(--mono);color:#cfd8d0;max-width:640px"><h2 style="color:#fff">Deleting account</h2><div class="bar" style="margin:18px 0"><i id="dfill"></i></div><pre id="dlog" style="white-space:pre-wrap;line-height:1.8;font-size:13px"></pre></div>`);
+  const log = document.getElementById("dlog"), fill = document.getElementById("dfill");
+  const items = ["payment history", "the receipt", "the support thread", "the guestbook entry", "the phone number", "the profile photo", "UNKNOWN-DEVICE", `the name ${trueName()}`];
+  for(let i=0;i<items.length;i++){ if(!live()) return; log.textContent += `removing ${items[i]} … `; await sleep(700); log.textContent += "done\n"; fill.style.width = ((i+1)/items.length*100) + "%"; AU.tick();
+    if(items[i] === "UNKNOWN-DEVICE"){ AU.scream(); SCARE.presence(600); await sleep(900); } }
+  await sleep(1200);
+  await voice([["sys","it's gone. your account is gone. it can't hold something that doesn't exist."],["sys","one more thing, if you want. i'm still in here. section 9.3 works for me too. type my name and i can go."]], {end:"none"});
+  if(!live()) return;
+  render(`<div class="wrap" style="padding-top:20vh;text-align:center;font-family:var(--mono);color:#cfd8d0"><p>type syslog's real name to let him go, or leave him be.</p>
+    <input id="sn" autocomplete="off" style="max-width:320px;margin:18px auto 0;display:block;text-align:center"><div style="display:flex;gap:10px;justify-content:center;margin-top:14px">
+    <button class="btn" id="snok" style="max-width:200px;margin-top:0">Delete him</button><button class="btn ghost" id="snno" style="max-width:200px">Leave him</button></div></div>`);
+  const freed = await new Promise(res => { document.getElementById("snok").onclick = () => { const v = document.getElementById("sn").value.toLowerCase(); if(/aaron|voss/.test(v)) res(true); else { AU.win98err(); document.getElementById("sn").value = ""; } };
+    document.getElementById("snno").onclick = () => res(false); });
+  if(freed){ await voice([["sys","thank you. it was cold in here. — s."]], {end:"none"}); state.freed = true; }
+  theEnd();
+}
+/* ---- ending 2: SIGNED OUT ---- */
+async function endSignedOut(){
+  state.ending = 2; NAMEBAR.hide(); SCARE.atmosphere(false); AU.stopAll(); AU.floor(true);
+  render(""); document.body.className = ""; document.body.style.filter = ""; document.body.style.background = "#000";
+  await voice([["sys","you're out. you're out. i'm—"],["pause",1600],["it","SEE YOU TOMORROW, {first}. I WILL KEEP YOUR SEAT WARM."]], {end:"none"});
+  await returnHome(3);
+}
+/* ---- ending 3: GOODNIGHT ---- */
+async function endGoodnight(){ state.ending = 3; NAMEBAR.hide(); SCARE.atmosphere(false); ending(); }
 /* --- syslog dies --- */
 const G_HOT = "#7dffb0";
 const corrupt = (s, amount) => [...s].map(c => Math.random() < amount ? pick(["▓","░","█","¥","§","∎","‡",c]) : c).join("");
@@ -2513,7 +2343,7 @@ async function finalTerminal(){
   AU.droneRise(10); AU.heartbeat(150); await sleep(1000);
   for(const s of ["IT WROTE EVERYTHING DOWN", "SO DID I", N.toUpperCase(), "TWICE"]){ if(!alive(t)) return finish(); itSays(s); AU.whisper(s.toLowerCase()); await sleep(1400); }
   await sleep(1000); finish();
-  basement();
+  accountSettings();
 }
 
 /* --- the loss --- */
@@ -2540,98 +2370,95 @@ async function ending(){
 }
 
 function theEnd(){
-  state.token++; SHADOW.off(); document.body.style.filter = ""; AU.stopAll(); SCARE.atmosphere(false);
+  LAYER.id++; state.token++; SHADOW.off(); document.body.style.filter = ""; AU.stopAll(); SCARE.atmosphere(false); NAMEBAR.hide(); RULES.hide();
   clearInterval(rainTimer); clearInterval(spamTimer); clearInterval(hudTimer);
   ["hack","dark","bios","void"].forEach(id => document.getElementById(id).style.display = "none");
   document.getElementById("toasts").innerHTML = ""; document.body.className = ""; document.body.style.background = "#000"; root.innerHTML = "";
-  tab(fullName(), "▪️");
+  const E = state.ending || 3;
+  const INFO = {
+    1: ["ENDING 1 / 3 — DELETED", state.freed ? "your account is gone. so is aaron's. there is nothing left for it to hold." : "your account is gone. it has nothing of yours to hold.", "#7dffb0"],
+    2: ["ENDING 2 / 3 — SIGNED OUT", "you got out. it didn't. it is still signed in as you, somewhere.", "#ffcc4d"],
+    3: ["ENDING 3 / 3 — GOODNIGHT", "you stayed signed in. it will take care of everything now.", "#ff2d55"]
+  }[E];
+  tab(E === 1 ? "Nimbus" : fullName(), "▪️");
   const end = document.getElementById("end"); end.style.display = "flex";
-  const rows = [...VICTIMS].sort((a,b) => a.y - b.y).map(v => `<tr><td>${esc(v.n)}</td><td>${v.y}</td><td>${v.s}</td></tr>`).join("");
-  document.getElementById("endname").innerHTML = `<table>${rows}<tr class="you"><td>${esc(fullName())}</td><td>2026</td><td>${Math.round(state.score)}</td></tr></table>`;
-  document.getElementById("endline").textContent = "";
-  setTimeout(() => { AU.unlock(); AU.thump(); document.getElementById("endname").innerHTML = `<table><tr class="you"><td>${esc(fullName())}</td><td>2026</td><td>${Math.round(state.score)}</td></tr></table>`; }, 5000);
-  const kept = trueName().replace(/\W/g,"").length - TAKEN.letters.length;
-  setTimeout(() => { document.getElementById("endline").textContent = TAKEN.letters.length
-    ? `thank you for subscribing. it kept: ${TAKEN.letters.join(" ")}. you left with ${kept} letters.`
-    : (state.deaths ? "thank you for subscribing. it kept nothing. it kept the memory of you trying." : "thank you for subscribing. it never touched you. it will remember that."); }, 8000);
-  setTimeout(() => { const h = document.getElementById("endhint"); h.innerHTML = '(it\'s over. you can close the tab — or <a href="#" id="again" style="color:#7d0f18">sign in again</a>.)'; h.style.opacity = "1";
-    document.getElementById("again").onclick = e => { e.preventDefault(); location.reload(); }; }, 20000);
-  setTimeout(() => AU.knock(-.9, 3), 18000);
-  setTimeout(() => AU.footsteps(8, -1, .2), 40000);
-  let haunt = 0; const again = () => { haunt++; AU.duck(1); setTimeout(() => { SCARE.presence(1400 + haunt*400); AU.whisper(pick([fullName().toLowerCase(), "you can close the tab", "i am still here", "thank you for subscribing"])); }, 900);
-    setTimeout(again, Math.max(20000, 55000 - haunt*6000)); };
-  setTimeout(again, 62000);
+  const rows = [...VICTIMS].sort((a,b) => a.y - b.y).map(v => `<tr><td>${esc(v.n)}</td><td>${v.y}</td><td>kept</td></tr>`).join("");
+  const you = E === 1 ? `<tr class="you"><td style="text-decoration:line-through">${esc(trueName())}</td><td>2026</td><td>deleted</td></tr>`
+                      : `<tr class="you"><td>${esc(fullName())}</td><td>2026</td><td>${E === 2 ? "signed out" : "kept"}</td></tr>`;
+  document.getElementById("endname").innerHTML = `<table>${rows.replace(state.freed ? "<td>Aaron Voss</td><td>2021</td><td>kept</td>" : "@@", "<td style='text-decoration:line-through'>Aaron Voss</td><td>2021</td><td>released</td>")}${you}</table>`;
+  document.getElementById("endline").innerHTML = "";
+  const kept = trueName().replace(/\W/g,"").length - TAKEN.letters.length, total = trueName().replace(/\W/g,"").length;
+  setTimeout(() => { AU.unlock(); AU.thump();
+    document.getElementById("endline").innerHTML = `<div style="color:${INFO[2]};font-size:clamp(14px,2.4vw,22px);letter-spacing:.18em">${INFO[0]}</div>
+      <div style="margin-top:14px;color:#9a8f8c;letter-spacing:.06em">${esc(INFO[1])}</div>
+      <div style="margin-top:22px;color:#6a605c;font-size:12px;letter-spacing:.1em">rules broken: ${state.broken || 0} · letters kept: ${kept} of ${total}</div>`; }, 3500);
+  setTimeout(() => { const h = document.getElementById("endhint");
+    h.innerHTML = `<a href="#" id="again" style="color:#c9c0bc;font-size:13px">▶ play again</a>${E !== 1 ? `<div style="margin-top:10px;color:#4a403c">there are three endings.</div>` : ""}`; h.style.opacity = "1";
+    document.getElementById("again").onclick = e => { e.preventDefault(); location.hash = ""; location.reload(); }; }, 7000);
+  if(E !== 1){ setTimeout(() => AU.knock(-.9, 3), 18000);
+    let haunt = 0; const again = () => { haunt++; AU.duck(1); setTimeout(() => { SCARE.presence(1400 + haunt*400); AU.whisper(pick([fullName().toLowerCase(), "you can close the tab", "i am still here", "thank you for subscribing"])); }, 900);
+      setTimeout(again, Math.max(20000, 55000 - haunt*6000)); };
+    setTimeout(again, 62000); }
 }
 
 /* ================================================================
    DEV — developer menu. Open it by typing  dev  as the username,
    or by adding  #dev  to the end of the page's URL.
-   Every scene and every minigame is listed with what it is, so you
-   don't need to know the story to find the part you're working on.
+   Every scene is listed with what it is, so you don't need to know
+   the story to find the part you're working on.
    ================================================================ */
 const DEV = {
-  on:false, result:null,
-  /* every story scene, in play order. "start" runs it and the game carries on from there. */
+  on:false,
+  /* every story scene, in play order. it runs from there like a normal playthrough. */
   SCENES: [
-    ["Act 1", "Sign-in page", "The fake cloud-storage login. Normal start of the game.", () => { state.attempt = 0; login(); }],
-    ["Act 1", "Plans page", "Pick-a-plan page with the joke pricing. Click Pro to continue.", () => plans()],
-    ["Act 1", "Checkout", "Order summary + the 'name for the receipt' fields (this is where the player's name is set).", () => checkout()],
-    ["Act 1", "Payment complete → terminal", "Confetti receipt, then it rolls straight into the hacked terminal.", () => done()],
-    ["Act 1", "Hacked terminal + popup overload", "Green terminal that goes wrong, then the window flood. Q fast-forwards. Leads into the dark part.", () => hack(render(""))],
-    ["Act 1", "The dark part (sigil + eyes)", "Black screen, red sigil, whispering, eyes that follow the cursor, first face scare. Then BIOS.", () => (async () => { const t = render(""); await darkPhase(t); await bios(t); act2Login(); })()],
-    ["Act 1", "BIOS reboot", "Fake boot screen. Ends Act 1 and opens Act 2.", () => (async () => { const t = render(""); await bios(t); act2Login(); })()],
-    ["Act 2", "Layer 1 · Support forum", "Dead forum with the player's thread. Click 'open your thread' → syslog's post → WITNESS minigame.", () => act2Login()],
-    ["Act 2", "Layer 2 · 1997 webring page", "THE NAMES page, guestbook signs itself → ROT BREAKER minigame.", () => layerTwo(true)],
-    ["Act 2", "Layer 3 · Index of doors", "Sign-in page that's slightly wrong, then the doors list → THE HALL stealth minigame.", () => layerThree(true)],
-    ["Act 2", "Layer 4 · The long dark → the name", "Lights-out scene with the face scare, then THE NAME dodge minigame.", () => layerFour(true)],
-    ["Act 2", "Layer 5 · 1998 copy dialog", "Windows 98 'Copying...' → THE COPY minigame → syslog dies.", () => (async () => { await layerFive(); finalTerminal(); })()],
-    ["Ending", "Syslog dies", "The helper's terminal corrupts line by line. Leads into the basement.", () => finalTerminal()],
-    ["Ending", "The basement (story)", "Intro dialogue → first-person BASEMENT minigame → ending.", () => basement()],
-    ["Ending", "Ending sequence", "Name windows, room flashes, slow face, 'goodnight', the last sign-in page.", () => ending()],
-    ["Ending", "Final screen", "The ledger of names. The very end.", () => theEnd()]
-  ],
-  /* each minigame on its own: no story before or after, comes back to this menu */
-  GAMES: [
-    ["WITNESS (layer 1)", "Click forum threads while they're being deleted. Win: survive 5 waves.", 1, () => witnessGame],
-    ["ROT BREAKER (layer 2)", "Brick breaker. Win: burn 40 bricks.", 2, () => breakerGame],
-    ["THE HALL (layer 3)", "Top-down stealth. Click to walk. Win: reach the ⌂ door 5 times.", 3, () => navigateGame],
-    ["THE NAME (layer 4)", "Dodge the letters of your name. Win: survive 40 seconds.", 4, () => nameGame],
-    ["THE COPY (layer 5)", "Ride the file list, grab files, thread gaps. Win: survive 4 waves.", 5, () => exfilGame],
-    ["THE BASEMENT (ending)", "First person. WASD, Shift sprint, F light. Win: 3 fuses, then the door.", 6, () => mazeGame]
+    ["Act 1 — the fake website", "Sign-in page", "The fake cloud-storage login. Normal start of the game.", () => { state.attempt = 0; login(); }],
+    ["Act 1 — the fake website", "Plans page", "Pick-a-plan page with the joke pricing. Click Pro to continue.", () => plans()],
+    ["Act 1 — the fake website", "Checkout", "Order summary + the 'name for the receipt' fields. This is where the player's name is set.", () => checkout()],
+    ["Act 1 — the fake website", "Payment complete → terminal", "Confetti receipt, then it rolls into the terminal.", () => done()],
+    ["Act 1 — the fake website", "Terminal + popup overload", "The terminal that goes wrong, then the window flood. Leads into the dark part.", () => hack(render(""))],
+    ["Act 1 — the fake website", "The dark part", "Red sigil, whispers, eyes that follow the cursor, first face scare. Then BIOS.", () => (async () => { const t = render(""); await darkPhase(t); await bios(t); act2Login(); })()],
+    ["Act 1 — the fake website", "BIOS reboot", "Fake boot screen. Ends Act 1 and opens Act 2.", () => (async () => { const t = render(""); await bios(t); act2Login(); })()],
+    ["Act 2 — the haunted pages (rules + puzzles)", "Layer 1 · Support forum", "Find syslog's 4-digit key in forum threads (real posts end '— s.'). Rules: your-name thread, moderator PM, fake reload.", () => act2Login()],
+    ["Act 2 — the haunted pages (rules + puzzles)", "Layer 2 · 1997 webring", "Visit 4 homepages, collect blinking words, sign the guestbook as someone else. Rules: counter, staring images, own name.", () => layerTwo()],
+    ["Act 2 — the haunted pages (rules + puzzles)", "Layer 3 · Index of /doors/", "Old file server. Read .txt notes to find stairs/down/exit/. Rules: unsorted listings, .you files, future dates.", () => layerThree()],
+    ["Act 2 — the haunted pages (rules + puzzles)", "Layer 4 · The phone", "Lights-out scene, then a phone: collect a 4-word phrase. Rules: call from yourself, 'is this you?', 3:33.", () => layerFour()],
+    ["Finale", "Syslog dies", "The helper's terminal corrupts line by line. Leads into the account page.", () => finalTerminal()],
+    ["Finale", "Account settings (choose an ending)", "Name recovery quiz returns letters. Keep me signed in / Log out / Delete account.", () => accountSettings()],
+    ["Finale", "Ending 1 — Deleted", "The true ending: deletion sequence, option to free syslog.", () => { PHRASE.words.length || (PHRASE.words = ["LANTERN","HOLLOW","CINDER","NOVEMBER"]); endDeleted(); }],
+    ["Finale", "Ending 2 — Signed out", "You leave; it stays signed in as you.", () => endSignedOut()],
+    ["Finale", "Ending 3 — Goodnight", "Room flashes, slow face, 'goodnight', the last sign-in page.", () => endGoodnight()],
+    ["Finale", "Final screen", "The ledger with ending name and stats.", () => theEnd()]
   ],
   SCARES: [
-    ["Face jump scare", "The full-screen face, after a second of silence.", async () => { await SCARE.faceHit(1200); SCARE.hide(); }],
-    ["Room flashes", "The dark room lit four times, someone closer each time.", async () => { for(let i=0;i<4;i++) await SCARE.flashRoom(i, i === 3 ? 260 : 100); SCARE.hide(); }],
+    ["Face jump scare", "The full-screen face after a second of silence.", async () => { await SCARE.faceHit(1300); SCARE.hide(); }],
+    ["Room flashes", "The dark room lit four times, the creature closer each time.", async () => { for(let i=0;i<4;i++) await SCARE.flashRoom(i, i === 3 ? 260 : 100); SCARE.hide(); }],
     ["Eyes in the dark", "Two points of light that blink.", () => SCARE.presence(2000)],
-    ["A letter is taken", "What happens when the player loses: one letter of their name is removed.", () => taking("dev: testing the letter-taking scene.")],
-    ["Retry prompt", "The 'try again / move on' screen shown after losing a round.", () => retryPrompt("dev test").then(again => DEV.toast(again ? "picked: try again" : "picked: move on"))]
+    ["A letter is taken", "What a broken rule does: one letter of the name is removed.", () => taking("dev: testing the letter-taking scene.")],
+    ["Creature pictures", "Every image of the creature the pages use (photos, staring GIF, avatar, mirror, door).", () => {
+      const v = document.createElement("div"); v.className = "viewer"; v.style.flexWrap = "wrap"; v.style.gap = "10px"; v.style.overflow = "auto";
+      v.innerHTML = ["photo:0","photo:1","photo:2","photo:3","stare","avatar:1","mirror:1","mirror:0","door"].map(k => `<figure style="margin:0;color:#aaa;font:11px monospace"><img alt="" style="width:200px" src="${CREATURE.img(k, 240, 180)}"><figcaption>${k}</figcaption></figure>`).join("") + "<button>✕ close</button>";
+      document.body.appendChild(v); v.querySelector("button").onclick = () => v.remove(); }]
   ],
-  init(){
-    this.bar = document.getElementById("devbar");
-    addEventListener("keydown", e => { if(this.on && e.key === "`") this.menu(); });
-  },
-  enable(){ if(this.on) return; this.on = true; this.bar.style.display = "flex"; this.drawBar(); setInterval(() => this.drawBar(), 500); },
+  init(){ this.bar = document.getElementById("devbar"); addEventListener("keydown", e => { if(this.on && e.key === "`") this.menu(); }); },
+  enable(){ if(this.on) return; this.on = true; document.documentElement.classList.add("devmode"); this.bar.style.display = "flex"; this.drawBar(); },
   drawBar(){
-    const arena = document.getElementById("arena").style.display === "block";
-    const sig = `${arena}|${state.ff}`; if(sig === this._sig) return; this._sig = sig;
     this.bar.innerHTML = `<button id="dv-menu" title="Back to the developer menu (or press \`)">☰ DEV MENU</button>
       <button id="dv-ff" class="${state.ff ? "on" : ""}" title="Makes every wait and typing animation instant">⏩ FAST-FORWARD ${state.ff ? "ON" : "OFF"}</button>
-      <button id="dv-win" ${arena ? "" : "disabled"} title="End the current minigame as a win">✓ WIN ROUND</button>
-      <button id="dv-lose" ${arena ? "" : "disabled"} title="End the current minigame as a loss">✕ LOSE ROUND</button>`;
+      <button id="dv-letter" title="Lose one letter, as if a rule was broken">− LETTER</button><button id="dv-restore" title="Give every letter back">+ ALL LETTERS</button>`;
     document.getElementById("dv-menu").onclick = () => this.menu();
     document.getElementById("dv-ff").onclick = () => SKIP.toggle();
-    document.getElementById("dv-win").onclick = () => { this.result = true; };
-    document.getElementById("dv-lose").onclick = () => { this.result = false; };
+    document.getElementById("dv-letter").onclick = () => { takeLetter(); NAMEBAR.update(); this.toast("letters now: " + fullName()); };
+    document.getElementById("dv-restore").onclick = () => { TAKEN.idx.length = 0; TAKEN.letters.length = 0; NAMEBAR.update(); this.toast("all letters restored"); };
   },
   toast(msg){ toast(`<b>DEV</b><br>${esc(msg)}`); },
   /* stop whatever is running and put the page back to a clean state */
   reset(){
-    state.skip = state.ff; state.fastLine = false; voice.id++;
-    if(document.getElementById("arena").style.display === "block"){ ARENA.killed = true; ARENA.close(); }
+    state.skip = state.ff; state.fastLine = false; voice.id++; LAYER.id++;
     ["hack","dark","bios","end","retry","game"].forEach(id => document.getElementById(id).style.display = "none");
     const v = document.getElementById("void"); v.style.display = "none"; v.innerHTML = "";
-    clearInterval(rainTimer); clearInterval(spamTimer); clearInterval(hudTimer); AU.stopAll(); AU.floor(false); MUSIC.stop();
-    SCARE.hide(); SCARE.atmosphere(false); SKIP.hide();
+    document.querySelectorAll(".viewer, .pm").forEach(e => e.remove());
+    clearInterval(rainTimer); clearInterval(spamTimer); clearInterval(hudTimer); AU.stopAll(); AU.floor(false);
+    SCARE.hide(); SCARE.atmosphere(false); SKIP.hide(); RULES.hide(); NAMEBAR.hide();
     document.body.className = ""; document.body.style.background = ""; document.body.style.filter = "";
     if(!state.first){ state.first = "Test"; state.last = "Subject"; }
     if(!state.user) state.user = "tester"; state.attempt = Math.max(state.attempt, 1); if(!state.charged) state.charged = 331.67;
@@ -2642,16 +2469,14 @@ const DEV = {
     const group = {}; this.SCENES.forEach((s,i) => (group[s[0]] = group[s[0]] || []).push([s,i]));
     render(`<div class="wrap devmenu">
       <h1>NIMBUS · DEVELOPER MENU</h1>
-      <p class="lead">Jump to any part of the game without playing through it. <b>Story scenes</b> start at that point and keep going like a normal playthrough.
-        <b>Minigames only</b> run a single game and come back here. The yellow bar at the top-left stays on screen: it returns here (or press <b>\`</b>), turns on fast-forward, and can force a minigame to win or lose.
+      <p class="lead">Jump to any part of the game without playing through it. Each scene starts at that point and keeps going like a normal playthrough.
+        The yellow bar at the top-left stays on screen: it returns here (or press <b>\`</b>), turns on fast-forward, and adds or removes letters of the player's name so you can test the endings.
         Open this menu any time by typing <b>dev</b> as the username on the sign-in page, or by adding <b>#dev</b> to the end of the URL.</p>
+      <p class="lead"><b>How the game works:</b> Act 1 is a fake website that turns. In Act 2 each layer is a broken web page with three rules (📜 RULES button, bottom-left). Breaking a rule costs one letter of the player's name (shown top-right). The finale's Delete ending needs every letter, so lost letters can be won back by answering what the player read along the way.</p>
       <div class="devrow"><span>Test player name:</span><input id="dvf" value="${esc(state.first)}" placeholder="First"><input id="dvl" value="${esc(state.last)}" placeholder="Last">
-        <label><input type="checkbox" id="dvff" ${state.ff ? "checked" : ""} style="width:auto"> fast-forward all waits</label></div>
-      <h2>STORY SCENES — in play order</h2>
-      ${Object.entries(group).map(([act, list]) => `<p class="lead" style="margin-top:14px;color:#c9d48a">${esc(act)}</p><div class="devgrid">${list.map(([s,i]) =>
+        <label><input type="checkbox" id="dvff" ${state.ff ? "checked" : ""} style="width:auto"> fast-forward</label></div>
+      ${Object.entries(group).map(([act, list]) => `<h2>${esc(act.toUpperCase())}</h2><div class="devgrid">${list.map(([s,i]) =>
         `<button data-scene="${i}"><b>${esc(s[1])}</b>${esc(s[2])}</button>`).join("")}</div>`).join("")}
-      <h2>MINIGAMES ONLY — returns here when the round ends</h2>
-      <div class="devgrid">${this.GAMES.map((g,i) => `<button data-game="${i}"><b>${esc(g[0])}</b>${esc(g[1])}</button>`).join("")}</div>
       <h2>SCARES — preview one effect</h2>
       <div class="devgrid">${this.SCARES.map((g,i) => `<button data-scare="${i}"><b>${esc(g[0])}</b>${esc(g[1])}</button>`).join("")}</div>
       <h2>STATE</h2>
@@ -2662,9 +2487,6 @@ const DEV = {
     const apply = () => { const f = document.getElementById("dvf").value.trim(), l = document.getElementById("dvl").value.trim(); if(f) state.first = f.slice(0,16); if(l) state.last = l.slice(0,16); };
     document.getElementById("dvff").onchange = e => SKIP.set(e.target.checked);
     document.querySelectorAll("[data-scene]").forEach(b => b.onclick = () => { apply(); AU.click(); this.reset(); const sc = this.SCENES[+b.dataset.scene]; this.toast(`starting: ${sc[1]}`); sc[3](); });
-    document.querySelectorAll("[data-game]").forEach(b => b.onclick = async () => { apply(); AU.click(); this.reset(); const g = this.GAMES[+b.dataset.game];
-      state.layer = g[2]; state.act = 2; DREAD.install(); render(""); document.body.style.background = "#000";
-      const won = await playRound(g[3](), "dev test"); this.toast(`${g[0]}: ${won ? "WON" : "LOST / moved on"}`); this.menu(); });
     document.querySelectorAll("[data-scare]").forEach(b => b.onclick = async () => { AU.click(); await this.SCARES[+b.dataset.scare][2](); });
     document.getElementById("dv-letters").onclick = () => { TAKEN.idx.length = 0; TAKEN.letters.length = 0; this.menu(); };
     document.getElementById("dv-reload").onclick = () => { location.hash = ""; location.reload(); };
