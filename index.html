@@ -19,6 +19,12 @@
   no network requests, no camera, no microphone. Use a made-up name and
   password; the game never reads the password.
 
+  FLOOR 9 ART lives in assets/f9: photo textures, gore decals, notes, and the
+  models (creature, Marisol, the bodies, your hand) as base64 GLB text files
+  (*.glb.txt) built in Blender. Floor 9 loads three.js r128 + GLTFLoader from a
+  CDN, renders small and blows it up with dithering for the PS1 look. Serve the
+  folder over http (not file://) so the models can load.
+
   FAST FORWARD (bottom-right during dialogue, or Q) makes story text and
   cutscene waits instant until it's turned off. Rule penalties still show.
 
@@ -2229,10 +2235,33 @@ const F1MAP = [
   "######################"
 ];
 const THREE_URL = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
-function loadThree(){
-  if(window.THREE) return Promise.resolve(true);
-  return new Promise(res => { const s = document.createElement("script"); s.src = THREE_URL; s.onload = () => res(true); s.onerror = () => res(false); document.head.appendChild(s); });
+const GLTF_URL = "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js";
+function loadScript(src){ return new Promise(res => { const s = document.createElement("script"); s.src = src; s.onload = () => res(true); s.onerror = () => res(false); document.head.appendChild(s); }); }
+async function loadThree(){
+  if(!window.THREE && !(await loadScript(THREE_URL))) return false;
+  if(!THREE.GLTFLoader && !(await loadScript(GLTF_URL))) return false;
+  return true;
 }
+/* Floor 9's art: photos and models made for this floor (assets/f9). Loaded once, kept for replays. */
+const F9 = {
+  base: "assets/f9/", tex: {}, glb: {}, ready: false,
+  TEX: ["wall","carpet","ceil","lino","concrete","tile","grate","mould","metal","wood","fabric","bloodfloor","vend","rack","breaker","locker","door","exit","board","cooler",
+        "elev_in","elev_out","elev_frame","poster","fridge","copier","extinguisher","vent","mirror","stairs","whiteboard","sign","blinds","scr_upload","scr_glitch",
+        "marisol_corrupt","marisol_emit","cursor.png","hand0.png","hand1.png","hand2.png","hand3.png","hand4.png","hand5.png","splat0.png","splat1.png","splat2.png","words.png","feet.png","drag.png","pool.png",
+        "note_it","note_elev","note_mar","memo","badge_evan","lunge"],
+  GLB: ["creature","marisol","body_chair","body_cables","body_floor","hand"],
+  async load(onProgress){
+    if(this.ready) return true;
+    const T = THREE, tl = new T.TextureLoader(), gl = new T.GLTFLoader(), total = this.TEX.length + this.GLB.length; let n = 0, failed = false;
+    const tick = () => { n++; onProgress && onProgress(n/total); };
+    const jobs = this.TEX.map(f => new Promise(res => { const file = f.includes(".") ? f : f + ".jpg", key = f.replace(/\.png$/, "");
+      tl.load(this.base + file, t => { t.encoding = T.sRGBEncoding; t.magFilter = T.NearestFilter; t.anisotropy = 2; this.tex[key] = t; tick(); res(); }, undefined, () => { failed = true; tick(); res(); }); }))
+      .concat(this.GLB.map(f => fetch(this.base + f + ".glb.txt").then(r => { if(!r.ok) throw 0; return r.text(); })                            // models ship as base64 text
+        .then(b64 => new Promise((res, rej) => { const bin = atob(b64.trim()), u = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i] = bin.charCodeAt(i); gl.parse(u.buffer, "", res, rej); }))
+        .then(g => { this.glb[f] = g; tick(); }, () => { failed = true; tick(); })));
+    await Promise.all(jobs); this.ready = !failed; return !failed;
+  }
+};
 
 /* canvas textures, drawn once */
 const F1ART = {
@@ -2297,29 +2326,61 @@ function floorOne(){
   return new Promise(async resolve => {
     const live = newLayer();
     state.layer = 10; state.act = 2; DREAD.install(); SHADOW.off(); NAMEBAR.hide(); RULES.hide(); SCARE.atmosphere(false);
-    render(`<div style="min-height:100vh;display:grid;place-content:center;font-family:var(--mono);color:#7dffb0;letter-spacing:.2em">LOADING FLOOR 9…</div>`);
+    render(`<div style="min-height:100vh;display:grid;place-content:end center;padding-bottom:12vh;font-family:var(--mono);color:#7dffb0;letter-spacing:.2em;background:#000 url(assets/f9/title.jpg) center/cover no-repeat"><div style="background:rgba(0,0,0,.6);padding:10px 18px;text-align:center">LOADING FLOOR 9… <span id="f9pct">0%</span><div style="margin-top:8px;height:3px;background:#1a2a20"><div id="f9bar" style="height:3px;width:0;background:#7dffb0"></div></div></div></div>`);
     document.body.className = "floor"; document.body.style.background = "#000"; tab("Nimbus — floor 9", "🔦");
     const ok = await loadThree();
     if(!live()) return;
     if(!ok){ render(`<div style="min-height:100vh;display:grid;place-content:center;text-align:center;font-family:var(--mono);color:#ff5e7a;padding:20px">Floor 9 needs an internet connection to load its 3D engine.<br><br><button class="btn" id="f1retry" style="max-width:220px">Try again</button></div>`);
       document.getElementById("f1retry").onclick = () => floorOne().then(resolve); return; }
-    render(""); F1ART.init();
+    const assetsOk = await F9.load(p => { const a = document.getElementById("f9pct"), b = document.getElementById("f9bar"); if(a) a.textContent = Math.round(p*100) + "%"; if(b) b.style.width = Math.round(p*100) + "%"; });
+    if(!live()) return;
+    if(!assetsOk){ render(`<div style="min-height:100vh;display:grid;place-content:center;text-align:center;font-family:var(--mono);color:#ff5e7a;padding:20px">Floor 9's art didn't finish loading.<br><br><button class="btn" id="f1retry" style="max-width:220px">Try again</button></div>`);
+      document.getElementById("f1retry").onclick = () => floorOne().then(resolve); return; }
+    render(""); F1ART.init(); const A = F9;
     AU.stopAll(); AU.floor(true); AU.drone(true); AU.ambience(true);
     const T = THREE, CELL = 2, WH = 3;
 
     /* ---------- renderer, scene, camera ---------- */
     const cv = document.createElement("canvas"); cv.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;z-index:79;display:block;touch-action:none"; document.body.appendChild(cv);
-    const renderer = new T.WebGLRenderer({canvas:cv, antialias:true, powerPreference:"high-performance"});
-    renderer.setPixelRatio(Math.min(1.5, devicePixelRatio || 1)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+    const renderer = new T.WebGLRenderer({canvas:cv, antialias:false, powerPreference:"high-performance"});
+    renderer.setPixelRatio(1); renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap;
+    /* PS1 look: every vertex snaps to a coarse grid (the wobble), the world renders small and is blown up with
+       ordered dithering, grain and colour bleed. */
+    if(!T.ShaderChunk.project_vertex.includes("PS1SNAP")) T.ShaderChunk.project_vertex += "\n/*PS1SNAP*/ if(gl_Position.w > 0.0){ vec2 g = vec2(200.0, 150.0); gl_Position.xy = floor(gl_Position.xy / gl_Position.w * g + 0.5) / g * gl_Position.w; }\n";
+    const rtMain = new T.WebGLRenderTarget(320, 240, {minFilter:T.NearestFilter, magFilter:T.NearestFilter}); rtMain.texture.encoding = T.sRGBEncoding;
+    const postMat = new T.ShaderMaterial({ depthTest:false, depthWrite:false,
+      uniforms:{ tDiffuse:{value:rtMain.texture}, res:{value:new T.Vector2(320, 240)}, time:{value:0}, fear:{value:0}, hurt:{value:0}, flashW:{value:0} },
+      vertexShader:"varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+      fragmentShader:`uniform sampler2D tDiffuse; uniform vec2 res; uniform float time, fear, hurt, flashW; varying vec2 vUv;
+        float b2(vec2 q){ return mod(2.0*q.x + 3.0*q.y, 4.0); }
+        float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); return (4.0*b2(mod(q, 2.0)) + b2(floor(q/2.0))) / 16.0; }
+        float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + time*17.0) * 43758.5453); }
+        void main(){
+          vec2 uv = vUv; float wob = fear*0.004*sin(uv.y*90.0 + time*30.0); uv.x += wob;
+          float ca = 0.001 + fear*0.0035;
+          vec3 c = vec3(texture2D(tDiffuse, uv + vec2(ca, 0.0)).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - vec2(ca, 0.0)).b);
+          vec2 px = floor(uv*res);
+          float lv = 22.0; c += (bayer(px) - 0.5)/lv; c = floor(c*lv + 0.5)/lv;
+          c += (hash(px) - 0.5)*(0.07 + fear*0.06);
+          c *= 0.92 + 0.08*step(0.5, fract(px.y*0.5));
+          float v = smoothstep(1.15, 0.35, length(vUv - 0.5)*(1.25 + fear*0.6)); c *= v;
+          c = mix(c, vec3(c.r*1.4 + 0.08, c.g*0.35, c.b*0.35), hurt);
+          c += flashW;
+          gl_FragColor = vec4(c, 1.0);
+        }` });
+    const postScene = new T.Scene(), postCam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1); postScene.add(new T.Mesh(new T.PlaneGeometry(2, 2), postMat));
     renderer.outputEncoding = T.sRGBEncoding; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = .9;
     const scene = new T.Scene(); scene.background = new T.Color(0x020203); scene.fog = new T.FogExp2(0x020203, .085);
     const camera = new T.PerspectiveCamera(72, innerWidth/innerHeight, .05, 60); camera.rotation.order = "YXZ"; scene.add(camera);
     const hud = document.createElement("canvas"); hud.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;z-index:80;pointer-events:none"; document.body.appendChild(hud);
     const hc = hud.getContext("2d"); let W = 0, H = 0;
     const fit = () => { W = innerWidth; H = innerHeight; renderer.setSize(W, H, false); camera.aspect = W/H; camera.updateProjectionMatrix();
+      const lh = Math.round(Math.max(220, Math.min(300, H/2.4))), lw = Math.round(lh*W/H); rtMain.setSize(lw, lh); postMat.uniforms.res.value.set(lw, lh);
       const d = Math.min(2, devicePixelRatio || 1); hud.width = W*d; hud.height = H*d; hc.setTransform(d,0,0,d,0,0); };
     fit(); addEventListener("resize", fit);
     const tex = (cv2, rx=1, ry=1) => { const t = new T.CanvasTexture(cv2); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(rx, ry); t.encoding = T.sRGBEncoding; t.anisotropy = 4; return t; };
+    const ptex = (name, rx=1, ry=1) => { const t = A.tex[name].clone(); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(rx, ry); t.needsUpdate = true; return t; };   // the photos
+    const photo = (name, w, h, x, y, z, ry=0, opts={}) => { const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshStandardMaterial(Object.assign({map:A.tex[name], roughness:.7}, opts))); m.position.set(x, y, z); m.rotation.y = ry; m.receiveShadow = true; scene.add(m); return m; };
 
     /* ---------- the floor plan ---------- */
     const MW = F1MAP[0].length, MH = F1MAP.length, grid = [], desks = [], monitors = [], doors = [], props = [], doorMap = new Map();
@@ -2339,12 +2400,12 @@ function floorOne(){
     const opaque = (x, z) => { const c = cellAt(x, z); if(c === 4) return doorAtXZ(x, z).t < .5; return c === 1 || c === 2; };
 
     /* ---------- materials ---------- */
-    const mWall = new T.MeshStandardMaterial({map:tex(F1ART.wall), roughness:.92}), mWallB = new T.MeshStandardMaterial({map:tex(F1ART.wallBlood), roughness:.85});
-    const mFloor = new T.MeshStandardMaterial({map:tex(F1ART.carpet, MW, MH), roughness:1}), mCeil = new T.MeshStandardMaterial({map:tex(F1ART.ceil, MW*.75, MH*.75), roughness:1});
-    const mDesk = new T.MeshStandardMaterial({color:0x2a231d, roughness:.75}), mMetal = new T.MeshStandardMaterial({color:0x121214, roughness:.6, metalness:.2});
+    const mWall = new T.MeshStandardMaterial({map:ptex("wall"), roughness:.92}), mWallB = new T.MeshStandardMaterial({map:ptex("mould"), roughness:.85});
+    const mFloor = new T.MeshStandardMaterial({map:ptex("carpet", MW, MH), roughness:1}), mCeil = new T.MeshStandardMaterial({map:ptex("ceil", MW/2, MH/2), roughness:1});
+    const mDesk = new T.MeshStandardMaterial({map:ptex("wood"), color:0x8a7a6a, roughness:.6}), mMetal = new T.MeshStandardMaterial({map:ptex("metal"), color:0x55565a, roughness:.55, metalness:.25});
     const mSkin = new T.MeshStandardMaterial({color:0x8f8276, roughness:.65}), mDark = new T.MeshStandardMaterial({color:0x0a0908, roughness:.9});
-    const mBlood = new T.MeshStandardMaterial({map:tex(F1ART.blood), transparent:true, roughness:.25, metalness:.1, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2});
-    const mDrag = new T.MeshStandardMaterial({map:tex(F1ART.drag), transparent:true, roughness:.3, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2});
+    const goreM = name => new T.MeshStandardMaterial({map:A.tex[name], transparent:true, alphaTest:.04, roughness:.18, metalness:.1, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2});
+    const mBlood = goreM("pool"), mDrag = goreM("drag"), mSplats = ["splat0", "splat1", "splat2", "pool", "feet"].map(goreM), mHands = [0,1,2,3,4,5].map(i => goreM("hand" + i));
     const mGore = new T.MeshStandardMaterial({color:0x4a0207, roughness:.3, metalness:.1});
     const box = (w, h, d, m, x, y, z, parent=scene, shadow=true) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = shadow; o.receiveShadow = true; parent.add(o); return o; };
 
@@ -2353,9 +2414,12 @@ function floorOne(){
       const touches = [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy]) => grid[y+dy] && grid[y+dy][x+dx] !== undefined && grid[y+dy][x+dx] !== 1 && grid[y+dy][x+dx] !== 2);
       if(!touches) continue; box(CELL, WH, CELL, (x*31 + y*17) % 7 === 0 ? mWallB : mWall, x*CELL + 1, WH/2, y*CELL + 1); }
     { const f = new T.Mesh(new T.PlaneGeometry(MW*CELL, MH*CELL), mFloor); f.rotation.x = -Math.PI/2; f.position.set(MW, 0, MH); f.receiveShadow = true; scene.add(f);
-      const c = new T.Mesh(new T.PlaneGeometry(MW*CELL, MH*CELL), mCeil); c.rotation.x = Math.PI/2; c.position.set(MW, WH, MH); scene.add(c); }
+      const c = new T.Mesh(new T.PlaneGeometry(MW*CELL, MH*CELL), mCeil); c.rotation.x = Math.PI/2; c.position.set(MW, WH, MH); scene.add(c);
+      for(const [x0, y0, x1, y1, name, rep2] of [[7, 9, 11, 11, "lino", 1], [1, 13, 20, 14, "lino", 1], [13, 9, 16, 11, "grate", 2], [18, 9, 20, 11, "concrete", 1]]){
+        const w = (x1 - x0 + 1)*CELL, h = (y1 - y0 + 1)*CELL, r = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshStandardMaterial({map:ptex(name, w/2*rep2, h/2*rep2), roughness:name === "grate" ? .5 : .8, metalness:name === "grate" ? .4 : 0}));
+        r.rotation.x = -Math.PI/2; r.position.set(x0*CELL + w/2, .004, y0*CELL + h/2); r.receiveShadow = true; scene.add(r); } }
     /* desks, chairs, monitors */
-    const screenMat = new T.MeshBasicMaterial({map:tex(F1ART.screen)}), offMat = new T.MeshStandardMaterial({color:0x050607, roughness:.2, metalness:.3});
+    const screenMat = new T.MeshBasicMaterial({map:A.tex.scr_upload}), offMat = new T.MeshStandardMaterial({color:0x050607, roughness:.2, metalness:.3});
     for(const d of desks){ const g = new T.Group(); d.g = g; g.position.set(d.x, 0, d.z); g.rotation.y = ((d.x*3 + d.z) % 4) * .05; scene.add(g);
       box(1.7, .06, .85, mDesk, 0, .76, 0, g); for(const [lx, lz] of [[-.78,-.36],[.78,-.36],[-.78,.36],[.78,.36]]) box(.05, .74, .05, mMetal, lx, .37, lz, g);
       box(1.6, .5, .03, mDesk, 0, .5, -.4, g);
@@ -2365,19 +2429,23 @@ function floorOne(){
       if(d.on) monitors.push(d); }
     /* blood: Marisol's office, the corridor, a drag toward the elevator */
     const decal = (m, x, z, s, rot=0, sx=1) => { const p = new T.Mesh(new T.PlaneGeometry(s*sx, s), m); p.rotation.x = -Math.PI/2; p.rotation.z = rot; p.position.set(x, .012, z); p.receiveShadow = true; scene.add(p); return p; };
-    for(const [x, z, s] of [[5.3, 20.2, 2.6], [8.4, 27.2, 1.6], [19, 26.8, 1.4], [30.4, 28.6, 1.8], [37.2, 27.4, 1.5], [24.8, 14.8, 1.2]]) decal(mBlood, x, z, s, Math.random()*6);
-    decal(mDrag, 28, 28, 3.2, .1, 4); decal(mDrag, 34, 27.6, 3, -.05, 4);
+    for(const [x, z, s, i] of [[5.3, 20.2, 2.2, 3], [8.4, 27.2, 1.6, 0], [19, 26.8, 1.4, 1], [30.4, 28.6, 1.8, 3], [37.2, 27.4, 1.5, 0], [24.8, 14.8, 1.2, 2], [29.6, 8.4, 1.3, 0], [15.6, 20.5, 1.1, 1]]) decal(mSplats[i], x, z, s, Math.random()*6, i === 3 ? 1.5 : 1);
+    decal(mDrag, 28, 28, 1.1, .02, 3); decal(mDrag, 34, 27.6, 1.0, -.05, 3);
+    for(let i=0;i<4;i++) decal(mSplats[4], 39 + (i % 2)*.2, 27.4 - i*1.7, 1.3, Math.PI + .1*(i % 2), .67);                                        // footprints, to the lockers
+    const wdecal = (m, w, h, x, y, z, ry) => { const p = new T.Mesh(new T.PlaneGeometry(w, h), m); p.position.set(x, y, z); p.rotation.y = ry; scene.add(p); return p; };
+    wdecal(mHands[0], .5, .65, 9.4, 1.3, 26.02, 0); wdecal(mHands[1], .7, .55, 11, 1.0, 26.02, 0); wdecal(mHands[3], .7, .6, 30.5, 1.1, 29.98, Math.PI); wdecal(mHands[2], .5, .65, 36, 1.4, 26.02, 0);
+    wdecal(mHands[5], .9, .55, 41.98, 1.2, 27.3, -Math.PI/2); wdecal(mHands[4], .5, .6, 2.02, 1.4, 19.2, Math.PI/2);
+    wdecal(goreM("words"), 2.6, 1.7, 29, 1.65, 15.98, Math.PI);                                                                                // IT SEES YOU LOGGED IN
     /* the plant */
-    { const g = new T.Group(); g.position.set(41, 0, 5); scene.add(g); box(.4, .45, .4, mDesk, 0, .22, 0, g);
-      const lm = new T.MeshStandardMaterial({color:0x17241a, roughness:.8}); for(let i=0;i<9;i++){ const l = new T.Mesh(new T.ConeGeometry(.05, 1.2, 4), lm); l.position.set(Math.cos(i)*.15, 1, Math.sin(i)*.15); l.rotation.set(Math.sin(i)*.5, 0, Math.cos(i)*.5); g.add(l); } }
+    { const cp = box(.75, 1.15, .7, new T.MeshStandardMaterial({color:0x6a6458, roughness:.6}), 41.4, .575, 5); photo("copier", .66, 1.02, 41.4 - .36, .56, 5, -Math.PI/2); }   // the copier that won't stop
 
     /* ---------- lights ---------- */
-    const hemi = new T.HemisphereLight(0x1a1c26, 0x050404, .22); scene.add(hemi);
-    const flash = new T.SpotLight(0xfff0d8, 1.6, 24, .48, .6, 2); flash.castShadow = true; flash.shadow.mapSize.set(1024, 1024); flash.shadow.camera.near = .2; flash.shadow.bias = -.0004;
+    const hemi = new T.HemisphereLight(0x262a38, 0x0a0806, .34); scene.add(hemi);
+    const flash = new T.SpotLight(0xfff0d8, 2.1, 26, .5, .6, 1.7); flash.castShadow = true; flash.shadow.mapSize.set(512, 512); flash.shadow.camera.near = .2; flash.shadow.bias = -.0004;
     flash.position.set(.24, -.24, -.68); camera.add(flash); const flashT = new T.Object3D(); flashT.position.set(0, -.05, -3); camera.add(flashT); flash.target = flashT;
     const pl = (col, i, d, x, y, z) => { const l = new T.PointLight(col, i, d, 2); l.position.set(x, y, z); l.base = i; scene.add(l); return l; };
     const LIGHTS = [pl(0xff2a1a, 1.4, 9, 40.6, 2.6, 28.6), pl(0xff2a1a, 1.1, 8, 23, 2.7, 17.2), pl(0xffd8a0, .9, 6, 5.6, 1.4, 18.4), pl(0x60ffa8, .7, 5, 7, 1.3, 4.6)];
-    for(const [x, z, ry] of [[40.6, 27.6, -Math.PI/2], [23, 16.6, 0]]){ const s = new T.Mesh(new T.PlaneGeometry(.7, .26), new T.MeshBasicMaterial({map:tex(F1ART.exit)})); s.position.set(x - (ry ? .55 : 0), 2.75, z + (ry ? 0 : .5)); s.rotation.y = ry; scene.add(s); }
+    for(const [x, z, ry] of [[40.6, 27.6, -Math.PI/2], [23, 16.6, 0]]){ const s = new T.Mesh(new T.PlaneGeometry(.62, .26), new T.MeshBasicMaterial({map:A.tex.exit})); s.position.set(x - (ry ? .55 : 0), 2.75, z + (ry ? 0 : .5)); s.rotation.y = ry; scene.add(s); }
 
     /* ---------- the clutter of a place people left in a hurry ---------- */
     const walk = []; for(let y=0;y<MH;y++) for(let x=0;x<MW;x++) if(grid[y][x] === 0) walk.push([x, y]);
@@ -2409,7 +2477,7 @@ function floorOne(){
     const dust = new T.Points(dustG, new T.PointsMaterial({color:0xd8d0c0, size:.005, transparent:true, opacity:.3, depthWrite:false})); camera.add(dust);
 
     /* ---------- doors: they open on hinges; closed ones block sight ---------- */
-    const mDoor2 = new T.MeshStandardMaterial({map:tex(F1ART.door), roughness:.7}), mHandle = new T.MeshStandardMaterial({color:0x9a9890, roughness:.3, metalness:.8});
+    const mDoor2 = new T.MeshStandardMaterial({map:A.tex.door, roughness:.7}), mHandle = new T.MeshStandardMaterial({color:0x9a9890, roughness:.3, metalness:.8});
     const startOpen = {"11,8":1, "19,12":1};
     for(const d of doors){ const alongX = grid[d.gy][d.gx - 1] === 1 && grid[d.gy][d.gx + 1] === 1; d.alongX = alongX;
       d.cx = d.gx*CELL + 1; d.cz = d.gy*CELL + 1; d.pivot = new T.Group(); scene.add(d.pivot);
@@ -2421,18 +2489,19 @@ function floorOne(){
     const nearDoor = () => doors.find(d => Math.hypot(d.cx - P.x, d.cz - P.z) < 2.3 && Math.floor(P.x/CELL)*1000 + Math.floor(P.z/CELL) !== d.gx*1000 + d.gy);
 
     /* ---------- the break room, the server room, the storage room ---------- */
-    const mFridge = new T.MeshStandardMaterial({color:0xc8c4ba, roughness:.35, metalness:.2}), mVend = new T.MeshBasicMaterial({map:tex(F1ART.vend)});
-    const mRack = new T.MeshStandardMaterial({map:tex(F1ART.rack), emissive:0xffffff, emissiveMap:tex(F1ART.rack), emissiveIntensity:.55, roughness:.4}), mLocker = new T.MeshStandardMaterial({map:tex(F1ART.locker), roughness:.5, metalness:.4});
+    const mFridge = new T.MeshStandardMaterial({color:0x9a968c, roughness:.45, metalness:.15}), mVend = new T.MeshStandardMaterial({map:A.tex.vend, emissive:0xffffff, emissiveMap:A.tex.vend, emissiveIntensity:.45, roughness:.3});
+    const mRack = new T.MeshStandardMaterial({map:A.tex.rack, emissive:0xffffff, emissiveMap:A.tex.rack, emissiveIntensity:.55, roughness:.4}), mLocker = new T.MeshStandardMaterial({map:A.tex.locker, roughness:.5, metalness:.3});
     const racks = [], lockers = []; let breaker = null;
     for(const pr of props){
-      if(pr.ch === "v"){ box(.95, 1.95, .85, mMetal, pr.x - .5, .98, pr.z); const f = new T.Mesh(new T.PlaneGeometry(.7, 1.6), mVend); f.position.set(pr.x - .02, 1.05, pr.z); f.rotation.y = Math.PI/2; scene.add(f); LIGHTS.push(pl(0x4a8aff, .55, 5, pr.x + .5, 1.2, pr.z)); }
-      if(pr.ch === "f"){ box(.8, 1.85, .7, mFridge, pr.x, .93, pr.z - .6); box(.02, .5, .03, mHandle, pr.x + .32, 1.3, pr.z - .24); const sm = new T.Mesh(new T.PlaneGeometry(.5, .2), mBlood); sm.position.set(pr.x, .3, pr.z - .24); scene.add(sm); }
+      if(pr.ch === "v"){ box(.95, 1.95, .85, mMetal, pr.x - .5, .98, pr.z); const f = new T.Mesh(new T.PlaneGeometry(.88, 1.85), mVend); f.position.set(pr.x - .02, 1.05, pr.z); f.rotation.y = Math.PI/2; scene.add(f); LIGHTS.push(pl(0x4a8aff, .55, 5, pr.x + .5, 1.2, pr.z)); }
+      if(pr.ch === "f"){ box(.8, 1.85, .7, mFridge, pr.x, .93, pr.z - .6); photo("fridge", .78, 1.8, pr.x, .92, pr.z - .245); }
       if(pr.ch === "t"){ const top = new T.Mesh(new T.CylinderGeometry(.6, .6, .05, 24), mDesk); top.position.set(pr.x, .74, pr.z); top.castShadow = top.receiveShadow = true; scene.add(top);
         const leg = new T.Mesh(new T.CylinderGeometry(.05, .05, .72, 8), mMetal); leg.position.set(pr.x, .36, pr.z); scene.add(leg);
         for(let k=0;k<3;k++){ const a = k*2.1, cx2 = pr.x + Math.cos(a)*.85, cz2 = pr.z + Math.sin(a)*.85; box(.4, .05, .4, mMetal, cx2, .46, cz2); const bk = box(.4, .45, .05, mMetal, cx2 + Math.cos(a)*.18, .7, cz2 + Math.sin(a)*.18); bk.rotation.y = -a + Math.PI/2; }
         addItem("bottle", pr.x + .2, .87, pr.z - .1); addItem("bottle", pr.x - .25, .87, pr.z + .15); addItem("battery", pr.x, .78, pr.z + .3); }
       if(pr.ch === "r"){ const rk = box(.8, 2.3, 1.1, mRack, pr.x, 1.15, pr.z); racks.push(rk); }
       if(pr.ch === "B"){ const g = new T.Group(); g.position.set(pr.x, 0, pr.z - .92); scene.add(g); box(.7, .9, .14, mMetal, 0, 1.4, 0, g);
+        { const bp = new T.Mesh(new T.PlaneGeometry(.58, .9), new T.MeshStandardMaterial({map:A.tex.breaker, roughness:.5})); bp.position.set(0, 1.4, .072); g.add(bp); }
         const lever = new T.Group(); lever.position.set(0, 1.4, .1); g.add(lever); box(.06, .3, .06, new T.MeshStandardMaterial({color:0xaa2a1a, roughness:.4}), 0, .15, 0, lever);
         const led = new T.Mesh(new T.SphereGeometry(.025, 8, 6), new T.MeshBasicMaterial({color:0xff2a1a})); led.position.set(.24, 1.7, .08); g.add(led);
         const sg = new T.Mesh(new T.PlaneGeometry(.5, .12), new T.MeshBasicMaterial({map:tex(F1ART.canvas(128, 32, (c) => { c.fillStyle = "#c8a020"; c.fillRect(0, 0, 128, 32); c.fillStyle = "#000"; c.font = "bold 16px sans-serif"; c.fillText("⚡ MAIN / ELEV", 8, 22); }))})); sg.position.set(0, 1.95, .08); g.add(sg);
@@ -2444,9 +2513,9 @@ function floorOne(){
 
     /* ---------- windows: the city, in the rain ---------- */
     const cityT = tex(F1ART.city), rainT = tex(F1ART.rain, 1, 1); const mCity = new T.MeshBasicMaterial({map:cityT, fog:false}), mRain = new T.MeshBasicMaterial({map:rainT, transparent:true, fog:false, depthWrite:false});
-    for(let x=7;x<=19;x++){ if(grid[0][x] !== 1 || grid[1][x] !== 0) continue; const w1 = new T.Mesh(new T.PlaneGeometry(1.7, 1.3), mCity.clone()); w1.material.map = cityT.clone(); w1.material.map.offset.x = (x*.13) % 1; w1.material.map.repeat.set(.25, 1); w1.material.map.needsUpdate = true;
-      w1.position.set(x*CELL + 1, 1.85, 2.02); scene.add(w1); const r1 = new T.Mesh(new T.PlaneGeometry(1.7, 1.3), mRain); r1.position.set(x*CELL + 1, 1.85, 2.03); scene.add(r1);
-      box(1.8, .06, .1, mMetal, x*CELL + 1, 1.2, 2.05, scene, false); box(1.8, .06, .1, mMetal, x*CELL + 1, 2.5, 2.05, scene, false); }
+    const mBlinds = new T.MeshBasicMaterial({map:A.tex.blinds, color:0x9a9a9a});
+    for(let x=7;x<=19;x+=2){ if(grid[0][x] !== 1 || grid[1][x] !== 0) continue; const w1 = new T.Mesh(new T.PlaneGeometry(2.3, 1.56), mBlinds); w1.position.set(x*CELL + 2, 1.75, 2.02); scene.add(w1);
+      const r1 = new T.Mesh(new T.PlaneGeometry(2.0, 1.3), mRain); r1.position.set(x*CELL + 2, 1.75, 2.025); scene.add(r1); }
 
     /* ---------- the desk phone that rings with your name ---------- */
     const lcdT = new T.CanvasTexture(F1ART.lcd); const drawLcd = txt => { const c = F1ART.lcd.getContext("2d"); c.fillStyle = "#9bd06a"; c.fillRect(0, 0, 128, 32); c.fillStyle = "#102010"; c.font = "bold 13px monospace"; c.fillText(txt.slice(0, 15), 4, 21); lcdT.needsUpdate = true; };
@@ -2463,142 +2532,116 @@ function floorOne(){
     if(mirrorDesk && !mirrorDesk.screen){ const s2 = new T.Mesh(new T.PlaneGeometry(.45, .28), new T.MeshBasicMaterial({color:0x050607})); s2.position.set(0, 1.0, -.118); mirrorDesk.g.add(s2); mirrorDesk.screen = s2; mirrorDesk.offScreen = true; }
 
     /* ---------- Marisol ---------- */
-    const mar = new T.Group(), MR = {}; if(marisolAt){ mar.position.set(marisolAt.x, 0, marisolAt.z); mar.rotation.y = 0; scene.add(mar);
-      const mPhone = new T.MeshStandardMaterial({color:0xd6cfbe, roughness:.35});
-      box(1.5, .06, .8, mDesk, 0, .76, -.45, mar); for(const lx of [-.7, .7]) box(.05, .74, .7, mMetal, lx, .37, -.45, mar);
-      box(.2, .07, .16, mPhone, -.45, .82, -.5, mar); box(.3, .05, .38, mPaper, .35, .81, -.55, mar);
-      box(.5, .06, .5, mMetal, 0, .46, .2, mar); box(.5, .62, .06, mMetal, 0, .8, .46, mar);
-      const cardigan = new T.MeshStandardMaterial({color:0x34313c, roughness:.95});
-      const mProf = [[0, 0], [.2, .02], [.21, .1], [.17, .25], [.16, .35], [.19, .48], [.18, .56], [.1, .62], [.05, .66], [0, .67]].map(([r, y]) => new T.Vector2(r, y));
-      const torso = new T.Mesh(new T.LatheGeometry(mProf, 20), cardigan); torso.scale.z = .75; torso.position.set(0, .5, .2); torso.rotation.x = -.22; torso.castShadow = true; mar.add(torso);
-      for(const s of [-1, 1]){ const th = new T.Mesh(new T.CylinderGeometry(.075, .065, .45, 8), cardigan); th.rotation.x = Math.PI/2; th.position.set(s*.1, .52, .02); mar.add(th);
-        const sh = new T.Mesh(new T.CylinderGeometry(.055, .045, .45, 8), mDark); sh.position.set(s*.1, .25, -.2); mar.add(sh); }
-      // left arm limp on the desk
-      const la = new T.Mesh(new T.CylinderGeometry(.045, .04, .4, 8), cardigan); la.position.set(-.2, .92, -.08); la.rotation.set(-1.2, 0, -.2); mar.add(la);
-      // head, bowed, hair hanging in front of it
-      MR.head = new T.Group(); MR.head.position.set(0, 1.1, .12); MR.head.rotation.x = -.75; mar.add(MR.head);
-      const skullM = new T.Mesh(new T.SphereGeometry(.115, 16, 12), mSkin); skullM.scale.set(1, 1.22, 1); skullM.position.y = .13; MR.head.add(skullM);
-      const fp = new T.Mesh(new T.PlaneGeometry(.22, .28), new T.MeshStandardMaterial({map:tex(F1ART.marisolFace), transparent:true, alphaTest:.05, roughness:.6})); fp.position.set(0, .13, -.112); fp.rotation.y = Math.PI; MR.head.add(fp);
-      const mHair = new T.MeshStandardMaterial({color:0x0b0908, roughness:.8, side:T.DoubleSide}); MR.hair = [];
-      for(let i=0;i<16;i++){ const a = -1.4 + i/15*2.8, hp = new T.Mesh(new T.PlaneGeometry(.06, .46), mHair); const g = new T.Group(); g.position.set(Math.sin(a)*.1, .25, -Math.cos(a)*.09); g.rotation.y = -a; g.front = Math.abs(a) < .95; MR.head.add(g);
-        hp.position.y = -.2; hp.rotation.x = .05; g.add(hp); g.rotation.x = -.15; MR.hair.push(g); }
-      const crown = new T.Mesh(new T.SphereGeometry(.125, 12, 10, 0, Math.PI*2, 0, Math.PI*.55), mHair); crown.position.y = .15; MR.head.add(crown);
-      // the right arm, up to her ear, and the hand that will not let go
-      const ua = new T.Mesh(new T.CylinderGeometry(.048, .042, .34, 8), cardigan); ua.position.set(.2, 1.02, .18); ua.rotation.set(-.3, 0, .4); mar.add(ua);
-      const fa = new T.Mesh(new T.CylinderGeometry(.04, .036, .28, 8), mSkin); fa.position.set(.22, 1.12, .04); fa.rotation.set(-1.0, 0, -.25); mar.add(fa);
-      const joint = (x, y, z, r, m) => { const j = new T.Mesh(new T.SphereGeometry(r, 12, 10), m); j.position.set(x, y, z); j.castShadow = true; mar.add(j); return j; };
-      joint(.2 + .07, 1.02 - .15, .18 + .05, .05, cardigan); joint(.17, 1.17, .3, .05, cardigan);                         // shoulder, elbow
-      joint(-.2, .92 + .18, -.08 + .07, .046, cardigan); joint(-.23, .74, -.23, .04, mSkin);                              // the other arm
-      joint(.215, 1.17, .02, .038, mSkin);                                                                             // wrist
-      const rec = box(.05, .045, .22, mPhone, .15, 1.28, -.02, mar); rec.rotation.x = -.35;
-      const palmM = new T.Mesh(new T.SphereGeometry(.042, 20, 16), mSkin); palmM.scale.set(.9, 1.2, .8); palmM.position.set(.19, 1.25, .0); mar.add(palmM);
-      MR.fingers = [];
-      for(let i=0;i<4;i++){ const f = new T.Mesh(new T.CylinderGeometry(.011, .0095, .085, 12), mSkin); f.rotation.z = Math.PI/2; f.position.set(.15, 1.3 - i*.022, -.045 + i*.004); mar.add(f); MR.fingers.push(f); joint(.193, 1.3 - i*.022, -.045 + i*.004, .012, mSkin);
-        const n = new T.Mesh(new T.SphereGeometry(.008, 6, 5), mGore); n.position.set(.11, 1.3 - i*.022, -.045 + i*.004); mar.add(n); }       // the nails are gone
-      const seam = new T.Mesh(new T.TorusGeometry(.045, .012, 6, 16), mGore); seam.position.set(.155, 1.26, -.03); seam.rotation.y = Math.PI/2; mar.add(seam);   // where skin has grown over plastic
-      for(let i=0;i<5;i++){ const d = new T.Mesh(new T.CylinderGeometry(.005, .004, .12 + i*.05, 4), mGore); d.position.set(.19 + (i%3)*.015, 1.12 - i*.03, .02 + i*.012); mar.add(d); }
-      // the lanyard has grown into her wrist. the card hangs from it.
-      MR.wrist = new T.Vector3(.215, 1.17, .02); MR.cardRest = new T.Vector3(.23, 1.0, -.035);
-      MR.lanyard = new T.Mesh(new T.CylinderGeometry(.005, .005, .17, 4), new T.MeshStandardMaterial({color:0x1b4a8a, roughness:.6})); MR.lanyard.position.set(.222, 1.085, -.008); mar.add(MR.lanyard);
-      MR.card = box(.085, .055, .006, new T.MeshStandardMaterial({color:0xe6e2d6, emissive:0x223344, emissiveIntensity:.6, roughness:.3}), MR.cardRest.x, MR.cardRest.y, MR.cardRest.z, mar, false);
-      MR.strip = new T.Mesh(new T.BoxGeometry(.03, .006, 1), new T.MeshStandardMaterial({color:0x7a0a12, roughness:.25, metalness:.1})); MR.strip.visible = false; mar.add(MR.strip);
+    const mar = new T.Group(), MR = {}; if(marisolAt){ mar.position.set(marisolAt.x, 0, marisolAt.z); mar.rotation.y = Math.PI; scene.add(mar);
+      // the reception desk, between her and the door you come in by
+      box(1.6, .06, .62, mDesk, 0, 1.02, .78, mar); box(1.6, .99, .05, mDesk, 0, .5, 1.07, mar); for(const lx of [-.78, .78]) box(.05, .99, .6, mDesk, lx, .5, .78, mar);
+      box(.2, .07, .16, new T.MeshStandardMaterial({color:0xd6cfbe, roughness:.35}), -.5, 1.085, .75, mar); box(.3, .02, .38, mPaper, .4, 1.06, .8, mar);
+      const body = A.glb.marisol.scene.clone(true); mar.add(body); MR.body = body;
+      body.traverse(o => { if(!o.isMesh) return; o.castShadow = true; o.receiveShadow = true; o.material = o.material.clone();
+        if(o.name === "badge" || (o.parent && o.parent.name === "badge")) MR.card = o; else if(o.material.name === "marisol_front") MR.front = o.material; });
+      if(!MR.card) MR.card = body.getObjectByName("badge");
+      MR.cardRest = MR.card.position.clone(); MR.neck = new T.Vector3(0, 1.43, .06); MR.wrist = MR.neck;
+      // the lanyard: two strands from the badge up into her throat
+      MR.lanyard = new T.Group(); mar.add(MR.lanyard); const mLan = new T.MeshStandardMaterial({color:0x1b3a8a, roughness:.6});
+      for(const sx of [-1, 1]){ const a = MR.cardRest.clone().add(new T.Vector3(sx*.012, .045, .005)), b = MR.neck.clone().add(new T.Vector3(sx*.035, 0, 0)), len = a.distanceTo(b);
+        const st = new T.Mesh(new T.CylinderGeometry(.004, .004, len, 4), mLan); st.position.copy(a).add(b).multiplyScalar(.5); st.lookAt(mar.localToWorld(b.clone())); st.rotateX(Math.PI/2); MR.lanyard.add(st); }
+      MR.strip = new T.Mesh(new T.BoxGeometry(.014, .008, 1), new T.MeshStandardMaterial({map:A.tex.marisol_corrupt ? ptex("bloodfloor", 1, 6) : null, color:0x8a2020, roughness:.15, metalness:.1})); MR.strip.visible = false; mar.add(MR.strip);
       MR.drops = Array.from({length:40}, () => { const d = new T.Mesh(new T.SphereGeometry(.007, 5, 4), mGore); d.visible = false; mar.add(d); d.v = new T.Vector3(); return d; });
-      decal(mBlood, marisolAt.x, marisolAt.z + .2, 2.4); }
+      MR.corrupt = () => { if(!MR.front) return; const t1 = A.tex.marisol_corrupt.clone(), t2 = A.tex.marisol_emit.clone(); t1.flipY = t2.flipY = false; t1.needsUpdate = t2.needsUpdate = true;
+        MR.front.map = t1; MR.front.emissive = new T.Color(0x9fc8ff); MR.front.emissiveMap = t2; MR.front.emissiveIntensity = 2.4; MR.front.needsUpdate = true; };
+      decal(mBlood, marisolAt.x, marisolAt.z - .3, 1.8, 0, 1.5); }
 
     /* ---------- the elevator ---------- */
     const ex = elev.gx*CELL, ez = elev.gy*CELL + 1;
-    const mDoor = new T.MeshStandardMaterial({color:0x8a8e94, roughness:.35, metalness:.75});
-    const doorL = box(.08, 2.5, .95, mDoor, ex - .04, 1.25, ez - .48), doorR = box(.08, 2.5, .95, mDoor, ex - .04, 1.25, ez + .48);
-    box(.1, .2, 2.2, mMetal, ex - .05, 2.6, ez); const panel = box(.04, .18, .12, new T.MeshBasicMaterial({color:0xff2a1a}), ex - .06, 1.2, ez - 1.15);
+    const crop = (name, u0, u1, v0, v1) => { const t = A.tex[name].clone(); t.needsUpdate = true; t.repeat.set(u1 - u0, v1 - v0); t.offset.set(u0, v0); return t; };
+    const elevPlane = (map, w, h, x, y, z) => { const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshStandardMaterial({map, roughness:.35, metalness:.35})); m.position.set(x, y, z); m.rotation.y = -Math.PI/2; m.receiveShadow = true; scene.add(m); return m; };
+    elevPlane(crop("elev_frame", .154, .740, 0, 1), 2, 3.23, ex - .03, 1.37, ez);
+    const doorL = elevPlane(crop("elev_out", .169, .4472, .0762, .849), .95, 2.5, ex - .05, 1.25, ez - .475), doorR = elevPlane(crop("elev_out", .4472, .726, .0762, .849), .95, 2.5, ex - .05, 1.25, ez + .475); const panel = box(.04, .18, .12, new T.MeshBasicMaterial({color:0xff2a1a}), ex - .06, 1.2, ez - 1.15);
     const indCv = F1ART.canvas(128, 40, () => {}), indTex = new T.CanvasTexture(indCv), ind = new T.Mesh(new T.PlaneGeometry(.5, .16), new T.MeshBasicMaterial({map:indTex}));
-    ind.position.set(ex - .1, 2.88, ez); ind.rotation.y = -Math.PI/2; scene.add(ind);
+    ind.scale.set(.7, .75, 1); ind.position.set(ex - .06, 2.79, ez + .37); ind.rotation.y = -Math.PI/2; scene.add(ind);
     const drawInd = txt => { const c = indCv.getContext("2d"); c.fillStyle = "#100"; c.fillRect(0, 0, 128, 40); c.fillStyle = "#ff3a2a"; c.font = "bold 28px monospace"; c.textAlign = "center"; c.fillText(txt, 64, 30); indTex.needsUpdate = true; };
     drawInd("B2");
     box(.05, WH, 2, new T.MeshStandardMaterial({color:0x6a5a40, roughness:.6, emissive:0x2a1a08}), ex + 1.95, WH/2, ez, scene);                   // the inside, warm and lit
+    elevPlane(A.tex.elev_in, 1.9, 1.43, ex + 1.9, 1.45, ez);
     const inside = pl(0xffd9a0, 0, 5, ex + 1, 2.6, ez);
     box(2, WH, .1, mMetal, ex + 1, WH/2, ez - 1.0); box(2, WH, .1, mMetal, ex + 1, WH/2, ez + 1.0);           // the car's side walls
 
-    /* ---------- the creature: built from people ---------- */
+    /* ---------- the creature: the website, crawled out of the screen ---------- */
     const CR = new T.Group(); scene.add(CR); CR.visible = false;
-    const mFlesh = new T.MeshStandardMaterial({color:0x9a8f84, map:tex(F1ART.skin, 1, 3), roughness:.7}), mFleshD = new T.MeshStandardMaterial({color:0x5a4f46, roughness:.8});
-    const limb = (len, r0, r1, m) => { const g = new T.Group(), mesh = new T.Mesh(new T.CylinderGeometry(r0, r1, len, 12), m); mesh.position.y = -len/2; mesh.castShadow = true; g.add(mesh);
-      const jt = new T.Mesh(new T.SphereGeometry(r0*1.15, 12, 10), m); jt.castShadow = true; g.add(jt); g.len = len; return g; };                                        // every joint is a knuckle
-    const hips = new T.Group(); hips.position.y = 1.35; CR.add(hips);
-    const spine = new T.Group(); hips.add(spine); spine.rotation.x = .35;
-    const torsoProfile = [[.0, .0], [.1, .02], [.12, .07], [.085, .2], [.07, .3], [.1, .4], [.15, .5], [.16, .6], [.15, .7], [.17, .78], [.13, .84], [.05, .9], [0, .91]].map(([r, y]) => new T.Vector2(r, y));
-    const torsoM = new T.Mesh(new T.LatheGeometry(torsoProfile, 22), mFlesh); torsoM.scale.z = .7; torsoM.castShadow = true; spine.add(torsoM);                      // starved: a waist you could close a hand around, a ribcage that isn't
-    for(let i=0;i<10;i++){ const v = new T.Mesh(new T.SphereGeometry(.022, 8, 6), mFleshD); v.position.set(0, .12 + i*.075, -.1 - Math.sin(i*.35)*.01); v.scale.set(1.3, .8, 1); spine.add(v); }   // the spine shows
-    for(const sx of [-1, 1]){ const bl = new T.Mesh(new T.SphereGeometry(.07, 12, 10), mFlesh); bl.position.set(sx*.08, .7, -.075); bl.scale.set(1, 1.3, .35); bl.rotation.z = sx*.3; spine.add(bl); }
-    for(let i=0;i<6;i++){ const rib = new T.Mesh(new T.TorusGeometry(.148 - Math.abs(i - 2)*.008, .008, 5, 16, Math.PI*.9), mFlesh); rib.position.set(0, .72 - i*.055, .015); rib.scale.set(1, 1, .72); rib.rotation.set(Math.PI/2, 0, Math.PI*.05); spine.add(rib); }
-    const mChestFace = new T.MeshStandardMaterial({map:tex(F1ART.marisolFace), transparent:true, alphaTest:.1, roughness:.5});
-    for(const [y, x, sz] of [[.55, .035, .1], [.36, -.03, .085]]){                                                  // faces, pushing out through the chest
-      const ring = new T.Mesh(new T.TorusGeometry(sz*.48, .012, 6, 16), mGore); ring.position.set(x, y, .105); ring.scale.set(1, 1.3, 1); spine.add(ring);
-      const pit = new T.Mesh(new T.CircleGeometry(sz*.5, 16), mGore); pit.position.set(x, y, .1); pit.scale.set(1, 1.3, 1); spine.add(pit);
-      const fp = new T.Mesh(new T.PlaneGeometry(sz, sz*1.25), mChestFace); fp.position.set(x, y, .112); spine.add(fp);
-      for(let k=0;k<3;k++){ const dr = new T.Mesh(new T.CylinderGeometry(.004, .003, .08 + k*.05, 4), mGore); dr.position.set(x - .02 + k*.02, y - sz*.7 - k*.02, .108); spine.add(dr); } }
-    const neck = new T.Group(); neck.position.y = .86; spine.add(neck);
-    const neckM = new T.Mesh(new T.CylinderGeometry(.035, .045, .38, 6), mFlesh); neckM.position.y = .19; neck.add(neckM);
-    const headG = new T.Group(); headG.position.y = .42; neck.add(headG);
-    const faceTex = tex(F1ART.face), faceOpenTex = tex(F1ART.faceOpen);
-    const faceMat = new T.MeshStandardMaterial({map:faceTex, transparent:true, alphaTest:.05, roughness:.6, side:T.DoubleSide});
-    const face = new T.Mesh(new T.PlaneGeometry(.46, .58), faceMat); headG.add(face);
-    const skull = new T.Mesh(new T.SphereGeometry(.15, 14, 12), mDark); skull.scale.set(1, 1.25, .7); skull.position.z = -.13; face.add(skull);
-    const eyeMat = new T.MeshBasicMaterial({color:0xfff4dc, fog:false}), eyes = [];
-    for(const x of [-.075, .075]){ const e = new T.Mesh(new T.SphereGeometry(.014, 8, 6), eyeMat); e.position.set(x, .03, .03); face.add(e); eyes.push(e); }
-    const shoulderY = .8, arms = [], legs = [];
-    for(const s of [-1, 1]){
-      const sh = new T.Group(); sh.position.set(s*.2, shoulderY, 0); spine.add(sh);
-      const up = limb(.62, .04, .032, mFlesh); sh.add(up); const el = new T.Group(); el.position.y = -.62; up.add(el);
-      const lo = limb(.72, .032, .025, mFlesh); el.add(lo); const wr = new T.Group(); wr.position.y = -.72; lo.add(wr);
-      const fingersA = [];
-      for(let f=0;f<4;f++){ const fg = limb(.15, .011, .008, mFleshD); fg.rotation.set(.1 + f*.05, 0, (f - 1.5)*.13*s); wr.add(fg);              // long fingers, two joints each
-        const k2 = new T.Group(); k2.position.y = -.15; fg.add(k2); const tip = limb(.14, .008, .004, mFleshD); k2.add(tip); fg.k = k2; fingersA.push(fg); }
-      arms.push({sh, el, s, fingers:fingersA});
-      const hp = new T.Group(); hp.position.set(s*.09, 0, 0); hips.add(hp);
-      const th = limb(.66, .05, .035, mFlesh); hp.add(th); const kn = new T.Group(); kn.position.y = -.66; th.add(kn);
-      const sn = limb(.66, .035, .025, mFlesh); kn.add(sn); legs.push({hp, kn, s});
-      for(let i=0;i<3;i++){ const st = new T.Mesh(new T.CylinderGeometry(.006, .004, .2 + i*.08, 4), mGore); st.position.set(.02*i - .02, -.25 - i*.1, .03); th.add(st); } }
-    const crPos = new T.Vector3(); let pose = 0, poseT = 0, twitch = 0;
+    const crG = A.glb.creature.scene; CR.add(crG); const bones = {}; let crMat = null;
+    crG.traverse(o => { if(o.isBone){ bones[o.name] = o; if(!o.userData.rest) o.userData.rest = o.quaternion.clone(); }
+      if(o.isMesh){ o.castShadow = true; o.frustumCulled = false;
+        if(o.material.name && o.material.name.startsWith("cursor")){ const ct = A.tex.cursor.clone(); ct.flipY = false; ct.needsUpdate = true; o.material = new T.MeshStandardMaterial({map:ct, alphaTest:.5, side:T.DoubleSide, roughness:.4}); }
+        else if(o.material.isMeshStandardMaterial){ crMat = o.material; crMat.color.setRGB(1.45, 1.3, 1.25); crMat.roughness = .42; crMat.emissive.setRGB(1, 1, 1); } } });
+    const crGlow = new T.PointLight(0xff4a30, 1.2, 4.5, 1.6); crGlow.position.set(0, 2.1, .9); CR.add(crGlow);   // the light from its throat: you see it before it's on you
+    const qd = new T.Quaternion(), ed = new T.Euler();
+    const setB = (n, x, y=0, z=0) => { const b = bones[n]; if(!b) return; ed.set(x, y, z); qd.setFromEuler(ed); b.quaternion.copy(b.userData.rest).multiply(qd); };
+    // poses, keyed by what it's doing. returns how far to sink the body
+    const crPose = (mode, ph, tw) => { const s = Math.sin(ph);
+      if(mode === "behind"){                                                                                       // tall, leaning over you, hands at your shoulders
+        setB("spine1", -.12); setB("spine2", .1); setB("spine3", .25); setB("neck1", .3); setB("neck2", .35); setB("head", .2, 0, .5 + tw*.3);
+        for(const S of ["L","R"]){ const k = S === "L" ? 1 : -1; setB("upper"+S, -.9, 0, -.25*k); setB("fore"+S, -.6); setB("b0"+S+"_0", -.4, 0, .3*k); } return 0; }
+      if(mode === "hunt"){                                                                                         // low and fast, every limb pulling it at you
+        setB("spine0", .55); setB("spine1", .3); setB("spine2", .15); setB("neck1", -.5); setB("neck2", -.45); setB("neck3", -.2); setB("head", -.2 + tw*.2, 0, tw*.5);
+        for(const S of ["L","R"]){ const k = S === "L" ? 1 : -1, w = S === "L" ? s : -s;
+          setB("thigh"+S, -.9 + w*.55); setB("shin"+S, 1.1 - w*.4); setB("foot"+S, -.3); setB("upper"+S, .55 - w*.6, 0, .15*k); setB("fore"+S, -.2 + Math.max(0, w)*.5);
+          for(let f=0;f<4;f++){ setB("f"+f+S+"_0", -.3); setB("f"+f+S+"_1", -.4); }
+          setB("b0"+S+"_0", .5 + w*.4); setB("b0"+S+"_1", -.3); setB("b1"+S+"_0", -.4 - w*.5); } return -.38; }
+      const sp = mode === "search" ? .15 : 1;                                                                      // upright, hunched, a slow stalk
+      setB("spine1", .15); setB("neck1", -.1); setB("head", 0, mode === "search" ? Math.sin(ph*.7)*1.0 : 0, .25 + tw);
+      for(const S of ["L","R"]){ const w = (S === "L" ? s : -s)*sp;
+        setB("thigh"+S, -w*.45); setB("shin"+S, Math.max(0, w)*.6 + .1); setB("upper"+S, w*.25 - .1); setB("fore"+S, .1);
+        for(let f=0;f<4;f++){ setB("f"+f+S+"_0", .2); setB("f"+f+S+"_1", .5); }
+        setB("b0"+S+"_0", w*.2); setB("b1"+S+"_0", -w*.2); }
+      return 0; };
+    const crPos = new T.Vector3(); let pose = 0, poseT = 0, twitch = 0, crY = 0;
     function poseCreature(mode0, dt, dist){
       const mode = mode0 === "check" ? "hunt" : mode0 === "listen" ? "search" : mode0;
       poseT += dt; const fps = mode === "hunt" ? 14 : 8; if(poseT < 1/fps) return; poseT = 0;                     // stop-motion: it only updates a few times a second
-      if(mode === "behind"){                                                                                       // right behind you, reaching for your shoulders
-        legs.forEach(L => { L.hp.rotation.x = 0; L.kn.rotation.x = .2; }); arms.forEach(A => { A.sh.rotation.x = -1.05 + Math.random()*.06; A.sh.rotation.z = A.s*.05; A.el.rotation.x = -.55; });
-        spine.rotation.x = .55; neck.scale.y = 1.3; headG.rotation.set(-.35, 0, .45 + (Math.random() - .5)*.2); face.material.map = faceOpenTex; face.material.needsUpdate = true; return; }
-      const speed = mode === "hunt" ? 1 : mode === "search" ? .15 : .55; pose += speed*1.25;
-      const sw = Math.sin(pose)*.55*speed + .05, hunting = mode === "hunt";
-      legs.forEach(L => { L.hp.rotation.x = sw*L.s; L.kn.rotation.x = Math.max(0, -sw*L.s)*.9 + .15; });
-      arms.forEach(A => { A.sh.rotation.x = hunting ? -1.1 + Math.sin(pose*2 + A.s)*.25 : -sw*A.s*.5 + .1; A.sh.rotation.z = A.s*(hunting ? .25 : .08); A.el.rotation.x = hunting ? -.4 : -.15;
-        A.fingers.forEach((f, i) => { f.rotation.x = .1 + i*.05 + (hunting ? -.35 : .25); f.k.rotation.x = hunting ? -.5 : .6; }); });
-      spine.rotation.x = hunting ? .75 : mode === "search" ? .2 : .4;
-      if(Math.random() < .12) twitch = (Math.random() - .5)*1.1;
-      neck.scale.y = mode === "search" ? 1.9 : hunting ? 1.15 : 1;
-      headG.rotation.set(hunting ? -.5 : 0, mode === "search" ? Math.sin(pose*.7)*1.2 : 0, (mode0 === "listen" ? .9 : .25) + twitch);
-      face.material.map = dist < 3 || hunting ? faceOpenTex : faceTex; face.material.needsUpdate = true;
+      pose += (mode === "hunt" ? 1 : mode === "search" ? .15 : .55)*1.25;
+      if(Math.random() < .12) twitch = (Math.random() - .5)*.9;
+      for(const n in bones) bones[n].quaternion.copy(bones[n].userData.rest);
+      crY = crPose(mode, pose, twitch);
+      if(crMat) crMat.emissiveIntensity = mode === "hunt" || mode === "behind" || dist < 3 ? 2.5 + Math.random()*2 : .8 + Math.random()*.4;
+      crGlow.intensity = (mode === "hunt" ? 2.2 : 1.1)*(Math.random() < .15 ? .3 : 1); crGlow.position.y = mode === "hunt" ? 1.3 : 2.1;   // the spinner in its throat
     }
 
 
     /* ---------- the hand that holds the light ---------- */
-    const hand = new T.Group(); camera.add(hand); hand.position.set(.26, -.3, -.5);
-    const tube = new T.Mesh(new T.CylinderGeometry(.028, .032, .26, 12), new T.MeshStandardMaterial({color:0x111214, roughness:.35, metalness:.6})); tube.rotation.x = Math.PI/2; hand.add(tube);
-    const lens = new T.Mesh(new T.CircleGeometry(.026, 16), new T.MeshBasicMaterial({color:0xfff2d0})); lens.position.z = -.131; hand.add(lens);
-    const mHand = new T.MeshLambertMaterial({color:0x6e5446}), mNail = new T.MeshLambertMaterial({color:0x9a8072}); const handLight = new T.PointLight(0xffe2c8, .5, .9, 2); handLight.position.set(.18, -.15, -.35); camera.add(handLight);
-    const palm = new T.Mesh(new T.BoxGeometry(.06, .07, .11), mHand); palm.position.set(.05, -.02, .03); palm.visible = false; hand.add(palm);
-    const fingers = [];
-    const fist = new T.Mesh(new T.SphereGeometry(.05, 12, 10), mHand); fist.scale.set(1.05, .95, 1.5); fist.position.set(.012, -.008, .0); hand.add(fist);
-    for(let i=0;i<4;i++){ const f = new T.Group(); f.position.set(-.028, .018, -.055 + i*.034); hand.add(f);
-      const seg = new T.Mesh(new T.SphereGeometry(.016, 8, 6), mHand); seg.scale.set(1, .85, 1); f.add(seg);
-      const nail = new T.Mesh(new T.SphereGeometry(.009, 6, 5), mNail.clone()); nail.position.set(-.012, -.006, 0); nail.scale.set(.6, 1, 1); f.add(nail); f.nail = nail;
-      const stump = new T.Mesh(new T.SphereGeometry(.014, 6, 5), mGore); stump.visible = false; f.add(stump); f.stump = stump; f.seg = seg; fingers.push(f); }
-    const thumb = new T.Mesh(new T.CylinderGeometry(.012, .011, .06, 6), mHand); thumb.position.set(-.01, .02, .02); thumb.rotation.set(.3, 0, .9); hand.add(thumb);
-    const arm = new T.Mesh(new T.CylinderGeometry(.035, .045, .35, 10), mHand); arm.position.set(.07, -.12, .2); arm.rotation.x = 1.2; hand.add(arm);
-    const drips = []; for(let i=0;i<3;i++){ const d = new T.Mesh(new T.CylinderGeometry(.003, .003, 1, 4), mGore); d.position.set(.0 + i*.01, -.06, .04 + i*.02); d.visible = false; hand.add(d); drips.push(d); }
+    const hand = new T.Group(); camera.add(hand); const handG = A.glb.hand.scene; hand.add(handG); let handMat = null;
+    handG.traverse(o => { if(o.isMesh){ o.frustumCulled = false; o.renderOrder = 2; handMat = o.material; } });
+    const handLight = new T.PointLight(0xffe2c8, 1.1, 1.1, 2); handLight.position.set(.02, .06, -.12); handG.scale.setScalar(.85); handG.position.set(.035, -.025, 0); camera.add(handLight);
+    const drips = []; for(let i=0;i<3;i++){ const d = new T.Mesh(new T.CylinderGeometry(.003, .003, 1, 4), mGore); d.position.set(.07 + i*.012, -.1, -.24 + i*.01); d.visible = false; hand.add(d); drips.push(d); }
     let lastDmg = -1;
     const updateHand = () => { const dmg = TAKEN.letters.length; if(dmg === lastDmg) return; lastDmg = dmg;
-      fingers.forEach((f, i) => { const gone = (dmg >= 3 && i === 3) || (dmg >= 5 && i === 2); f.seg.visible = f.nail.visible = !gone; f.stump.visible = gone;
-        f.nail.material.color.set(i === 3 && dmg >= 1 ? (dmg >= 2 ? 0x4a0207 : 0x0b0806) : 0x9a8072); });
-      mHand.color.set(dmg >= 2 ? 0x5a4038 : 0x6e5446); drips.forEach(d => d.visible = dmg >= 3);
+      if(handMat) handMat.color.setRGB(1 - dmg*.05, 1 - dmg*.12, 1 - dmg*.12); drips.forEach(d => d.visible = dmg >= 2);
       flash.color.set(dmg >= 4 ? 0xffc0a8 : dmg >= 2 ? 0xffe0c8 : 0xfff0d8); };
+
+    /* ---------- the people who didn't leave, the things on the walls, the notes ---------- */
+    const bodyAt = (name, x, y, z, ry, rx=0) => { const g = A.glb[name].scene; g.position.set(x, y, z); g.rotation.set(rx, ry, 0); g.traverse(o => { if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } }); scene.add(g); return g; };
+    bodyAt("body_chair", 35.2, 0, 14.35, 0);                    // still at his desk
+    bodyAt("body_cables", 32.4, 0, 23.55, Math.PI);             // plugged in. Evan.
+    bodyAt("body_floor", 16.4, .07, 27.3, 0, -Math.PI/2); decal(mSplats[3], 17.3, 27.2, 1.4, .4, 1.5);   // she almost made it to the stairs
+    photo("sign", 2.1, .43, 5, 2.25, 2.02);                                                         // FLOOR 9 — NIMBUS CLOUD SERVICES
+    photo("mirror", 1.3, .92, 2.02, 1.55, 6.4, Math.PI/2, {roughness:.15, metalness:.3});            // DONT LOG OUT
+    photo("poster", .6, .8, 2.02, 1.6, 21.5, Math.PI/2);
+    photo("whiteboard", 2.4, 1.2, 17, 1.55, 15.98, Math.PI);
+    photo("board", 1.6, 1.09, 18, 1.55, 18.02);
+    photo("extinguisher", .55, .9, 13, 1.25, 26.02);
+    photo("stairs", 1.1, 1.97, 2.02, .985, 27, Math.PI/2);
+    box(.34, 1.0, .32, new T.MeshStandardMaterial({color:0x8a8478, roughness:.5}), 14.25, .5, 23); photo("cooler", .3, .9, 14.425, .5, 23, Math.PI/2);
+    { const bt = new T.Mesh(new T.CylinderGeometry(.15, .15, .42, 16), new T.MeshStandardMaterial({color:0x6a8ab0, transparent:true, opacity:.55, roughness:.1})); bt.position.set(14.25, 1.22, 23); scene.add(bt); }
+    for(const [x, z] of [[24, 7], [12, 3], [30, 21], [33, 27]]){ const v = new T.Mesh(new T.PlaneGeometry(.6, .6), new T.MeshStandardMaterial({map:A.tex.vent, roughness:.6})); v.rotation.x = Math.PI/2; v.position.set(x, WH - .01, z); scene.add(v); }
+    const NOTES = [{key:"note_it", x:7.3, y:.8, z:5.15, w:.3, h:.2, label:"READ THE NOTE"}, {key:"memo", x:23.2, y:.8, z:9.1, w:.22, h:.28, label:"READ THE MEMO"},
+      {key:"note_mar", x:4.2, y:.012, z:16.2, w:.25, h:.27, label:"READ THE NOTE"}, {key:"note_elev", x:32.6, y:.012, z:21.4, w:.3, h:.2, label:"READ THE NOTE"},
+      {key:"badge_evan", x:31.6, y:.012, z:22.9, w:.15, h:.1, label:"LOOK AT THE BADGE"}];
+    for(const n of NOTES){ const m = new T.Mesh(new T.PlaneGeometry(n.w, n.h), new T.MeshStandardMaterial({map:A.tex[n.key], roughness:.85, emissive:0x30302a})); m.rotation.set(-Math.PI/2, 0, (n.x*7) % 1 - .5); m.position.set(n.x, n.y + .004, n.z); scene.add(m); n.mesh = m; }
+    const nearNote = () => NOTES.find(n => Math.hypot(n.x - P.x, n.z - P.z) < 1.3);
+    function showNote(n){ paused = true; n.read = true; AU.click(); const ov = document.createElement("div");
+      ov.style.cssText = "position:fixed;inset:0;z-index:9993;background:rgba(0,0,0,.88);display:grid;place-items:center;padding:20px;touch-action:none";
+      ov.innerHTML = `<img src="${F9.base + n.key}.jpg" style="max-width:min(92vw,900px);max-height:78vh;box-shadow:0 0 60px #000;filter:contrast(1.05) brightness(.92)"><div style="position:absolute;bottom:calc(22px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#cfc6c0;font:600 13px var(--mono);letter-spacing:.1em">TAP TO PUT IT DOWN</div>`;
+      document.body.appendChild(ov); const close = e => { e.preventDefault(); ov.remove(); paused = false; last = performance.now(); lookDX = lookDY = 0; }; setTimeout(() => { ov.addEventListener("pointerdown", close); }, 350); }
+    function flashScreen(name, ms){ const ov = document.createElement("div"); ov.style.cssText = `position:fixed;inset:0;z-index:9992;background:#000 url(${F9.base + name}.jpg) center/cover no-repeat;pointer-events:none`; document.body.appendChild(ov); setTimeout(() => ov.remove(), ms); }
 
     /* ---------- player and story state ---------- */
     const P = {x:start.x, z:start.z, yaw:0, pitch:0, bob:0, stamina:1, hidden:null, breath:1, holding:false, eye:1.62, vx:0, vz:0, sway:0, cy:1.62, cx:null, cz:null, bat:1, held:null};
@@ -2690,9 +2733,10 @@ function floorOne(){
     const context = () => {
       if(caught || done || paused) return null;
       if(P.hidden) return P.hidden.kind === "locker" ? "LEAVE THE LOCKER" : "LEAVE THE DESK";
-      if(!hasCard && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 2.2) return "TAKE THE KEYCARD";
+      if(!hasCard && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 2.2) return "TAKE HER BADGE";
       if(breaker && hasCard && !powered && Math.hypot(breaker.x - P.x, breaker.z - P.z) < 1.9) return "FLIP THE BREAKER";
       if(Math.hypot(ex - 1 - P.x, ez - P.z) < 2.4 && !scripted.elevOpen && !scripted.elevCalled) return "CALL THE ELEVATOR";
+      { const n = nearNote(); if(n) return n.label; }
       const it = nearItem(); if(it) return it.kind === "battery" ? "TAKE THE BATTERY" : `PICK UP THE ${it.kind.toUpperCase()}`;
       const dr = nearDoor(); if(dr) return dr.target ? "CLOSE THE DOOR" : "OPEN THE DOOR";
       if(nearLocker()) return "HIDE IN THE LOCKER";
@@ -2706,12 +2750,13 @@ function floorOne(){
       if(c === "HIDE IN THE LOCKER"){ const l = nearLocker(); C.sawHide = seenHiding(); P.hidden = {kind:"locker", l}; P.px = P.x; P.pz = P.z; P.x = l.x + l.face*.12; P.z = l.z; P.lockYaw = l.face > 0 ? -Math.PI/2 : Math.PI/2; P.tyaw = P.yaw = P.lockYaw; P.pitch = P.tpitch = 0;
         fl = false; if(btnLight) btnLight.classList.remove("on"); P.breath = 1; AU.creak(); if(C.sawHide) say("It saw you get in.", 2.5, "n"); return; }
       if(c === "LEAVE THE DESK" || c === "LEAVE THE LOCKER"){ if(P.hidden.kind === "locker") AU.creak(); P.x = P.px; P.z = P.pz; P.hidden = null; C.sawHide = false; return; }
-      if(c === "TAKE THE KEYCARD") return takeCard();
+      if(c === "TAKE HER BADGE") return takeCard();
+      if(c.startsWith("READ THE") || c === "LOOK AT THE BADGE") return showNote(nearNote());
       if(c === "TAKE THE BATTERY"){ const it = nearItem(); it.state = "gone"; it.mesh.visible = false; P.bat = Math.min(1, P.bat + .6); scripted.batDead = false; AU.chord(); say("A battery. The flashlight is brighter.", 2.5, "n"); return; }
       if(c.startsWith("PICK UP")){ const it = nearItem(); it.state = "held"; P.held = it; camera.add(it.mesh); it.mesh.position.set(-.27, -.3, -.62); it.mesh.rotation.set(.25, 0, .15); it.mesh.scale.setScalar(.75);
         say(touch ? "Tap THROW to throw it. It will go to the noise." : "Press R (or right-click) to throw it. It will go to the noise.", 4, "n"); return; }
       if(c === "OPEN THE DOOR" || c === "CLOSE THE DOOR"){ const d = nearDoor(); setDoor(d, c === "OPEN THE DOOR"); return; }
-      if(c === "FLIP THE BREAKER"){ powered = true; surge = 1.6; breaker.lever.rotation.x = -.9; breaker.led.material.color.set(0x2aff6a); AU.hit(); AU.thump(); setTimeout(() => AU.hum(), 300);
+      if(c === "FLIP THE BREAKER"){ powered = true; surge = 1.6; flashScreen("lost", 900); postMat.uniforms.flashW.value = .6; breaker.lever.rotation.x = -.9; breaker.led.material.color.set(0x2aff6a); AU.hit(); AU.thump(); setTimeout(() => AU.hum(), 300);
         panel.material.color.set(0xffc82a); say("The whole floor comes on for a second. Then off. Everything heard that.", 5, "n");
         setTimeout(() => { if(!live()) return; AU.stinger(); say("it's coming to the server room. go. now. — s.", 5); }, 1400);
         C.mode = "hunt"; C.lastX = breaker.x; C.lastZ = breaker.z; C.grace = 1.2; C.path = []; if(Math.hypot(C.x - P.x, C.z - P.z) < 8){ C.x = 5; C.z = 27; }
@@ -2748,35 +2793,34 @@ function floorOne(){
       removeEventListener("pointerdown", down); removeEventListener("pointerup", up); removeEventListener("touchstart", down); removeEventListener("touchend", up); removeEventListener("keydown", kk); removeEventListener("keyup", kk);
       CS = null; lookDX = lookDY = 0; renderer.toneMappingExposure = .9; AU.breath(false); paused = false; if(!live()) return;
       hasCard = true; checkpoint = {x:P.x, z:P.z, yaw:P.yaw}; AU.whisper("thank you for holding");
-      say("She whispered something. Then the phone in her hand started ringing.", 5, "n");
+      say("She whispered something. Then the phone on her desk started ringing.", 5, "n");
       const ring = setInterval(() => { if(!live() || done) return clearInterval(ring); const d = Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z); if(d < 14) AU.tone(1180, "square", .005, .05/(1 + d*.2), .25); }, 900);
       setTimeout(() => { if(!live()) return; AU.stinger(); say("it heard that. it's coming to look. get to the elevator: end of the bottom corridor, on the right. — s.", 7);
         setObj("Get to the elevator: end of the bottom corridor, on the right."); C.mode = "investigate"; C.tgt = [Math.floor(marisolAt.x/CELL), Math.floor(marisolAt.z/CELL)]; C.grace = 1.5; C.x = 25; C.z = 27; C.path = []; }, 2200);
     }
     const L2W = v => mar.localToWorld(v.clone());
     function cardScene(dt){
-      const camT = L2W(new T.Vector3(.38, 1.24, -.5)), lookHand = L2W(new T.Vector3(.19, 1.15, -.02)), lookFace = L2W(new T.Vector3(0, 1.24, -.05));
-      dummy.position.copy(camT); dummy.lookAt(CS.phase === "snap" || CS.phase === "out" ? lookFace : lookHand);
+      const camT = L2W(new T.Vector3(.05, 1.3, .6)), lookCard = L2W(MR.cardRest.clone().add(new T.Vector3(0, .05, 0))), lookFace = L2W(new T.Vector3(0, 1.5, .05));
+      dummy.position.copy(camT); dummy.lookAt(CS.phase === "snap" || CS.phase === "out" ? lookFace : lookCard);
       const ease = k => k < .5 ? 2*k*k : 1 - Math.pow(-2*k + 2, 2)/2;
-      renderer.toneMappingExposure = CS.phase === "out" ? .9 : .72;
-      if(CS.phase === "in"){ CS.k = Math.min(1, CS.k + dt/.8); const e = ease(CS.k); camera.position.lerpVectors(CS.from.pos, camT, e); camera.quaternion.copy(CS.from.q).slerp(dummy.quaternion, e); if(CS.k >= 1){ CS.phase = "pull"; say("The card is on a lanyard. The lanyard has grown into her wrist.", 4, "n"); } return; }
+      renderer.toneMappingExposure = CS.phase === "out" ? .9 : .8;
+      if(CS.phase === "in"){ CS.k = Math.min(1, CS.k + dt/.8); const e = ease(CS.k); camera.position.lerpVectors(CS.from.pos, camT, e); camera.quaternion.copy(CS.from.q).slerp(dummy.quaternion, e); if(CS.k >= 1){ CS.phase = "pull"; say("Her badge. The lanyard doesn't go around her neck. It goes into it.", 5, "n"); } return; }
       if(CS.phase === "pull"){
         CS.p = CS.hold ? Math.min(1, CS.p + dt/2.8) : Math.max(0, CS.p - dt*.15);
         const p = CS.p, sh = p*.006; camera.position.copy(camT).add(new T.Vector3((Math.random() - .5)*sh, (Math.random() - .5)*sh, 0)); camera.quaternion.copy(dummy.quaternion);
-        const cardPos = MR.cardRest.clone().add(new T.Vector3(-.02*p, -.03*p, -.3*p)); MR.card.position.copy(cardPos); MR.card.rotation.set(-.4*p, .3*p, .2*p);
+        const cardPos = MR.cardRest.clone().add(new T.Vector3(.01*p, .03*p, .38*p)); MR.card.position.copy(cardPos); MR.card.rotation.set(-.3*p, .2*p, .15*p);
         MR.lanyard.visible = p < .05; MR.strip.visible = p >= .05;
-        if(p >= .05){ const a = MR.wrist, len = a.distanceTo(cardPos); MR.strip.position.copy(a).add(cardPos).multiplyScalar(.5); MR.strip.scale.set(1 + p*.6, 1, len); MR.strip.lookAt(L2W(cardPos)); }
-        MR.fingers.forEach((f, i) => f.rotation.x = CS.hold ? (Math.random() - .5)*p*.5 : 0);
+        if(p >= .05){ const a = MR.neck, len = a.distanceTo(cardPos); MR.strip.position.copy(a).add(cardPos).multiplyScalar(.5); MR.strip.scale.set(1 + p*.8, 1, len); MR.strip.lookAt(L2W(cardPos)); }
+        MR.body.position.set(CS.hold ? (Math.random() - .5)*.008*p : 0, 0, .05*p);                                   // she comes with it
         if(CS.hold){ if(Math.random() < dt*10*p) crack(.4, 0); if(Math.random() < dt*3) AU.wet(); }
-        if(CS.hold && Math.random() < dt*30*p){ const d = MR.drops.find(x => !x.visible); if(d){ d.visible = true; d.position.copy(MR.wrist).add(new T.Vector3(0, -.02, -.02)); d.v.set((Math.random() - .5)*.3, -.2 - Math.random()*.3, -(Math.random())*.4); } }
-        if(p >= 1){ CS.phase = "snap"; CS.k = 0; MR.card.visible = false; MR.strip.visible = false; AU.hit(); AU.wet(); AU.scream();
-          for(const d of MR.drops){ d.visible = true; d.position.copy(MR.wrist); d.v.set((Math.random() - .5)*1.2, Math.random()*.8, -Math.random()*1.2); } }
+        if(CS.hold && Math.random() < dt*30*p){ const d = MR.drops.find(x => !x.visible); if(d){ d.visible = true; d.position.copy(MR.neck); d.v.set((Math.random() - .5)*.3, -.2 - Math.random()*.3, Math.random()*.4); } }
+        if(p >= 1){ CS.phase = "snap"; CS.k = 0; MR.card.visible = false; MR.strip.visible = false; AU.hit(); AU.wet(); AU.scream(); MR.corrupt(); postMat.uniforms.hurt.value = .8;
+          for(const d of MR.drops){ d.visible = true; d.position.copy(MR.neck); d.v.set((Math.random() - .5)*1.2, Math.random()*.8, Math.random()*1.2); } }
       }
-      if(CS.phase === "snap"){ CS.k += dt; const e = Math.min(1, CS.k/.12);
-        MR.head.rotation.x = -.75 + (.18 + .75)*e; MR.hair.forEach(g => { if(g.front) g.visible = e < .5; else g.rotation.x = -.15 + e*.35; });
+      if(CS.phase === "snap"){ CS.k += dt; MR.body.position.z = .05 + (CS.k < .14 ? CS.k/.14*.18 : .18); MR.body.position.x = CS.k < 1 ? (Math.random() - .5)*.02 : 0;   // she lurches at you, and stays there
         const sh = Math.max(0, .02 - CS.k*.015); camera.position.copy(camT).add(new T.Vector3((Math.random() - .5)*sh, (Math.random() - .5)*sh, 0));
         camera.quaternion.slerp(dummy.quaternion, Math.min(1, dt*14));
-        if(CS.k > 1.4){ CS.phase = "out"; CS.k = 0; CS.from = {pos:camera.position.clone(), q:camera.quaternion.clone()}; } }
+        if(CS.k > 1.6){ CS.phase = "out"; CS.k = 0; CS.from = {pos:camera.position.clone(), q:camera.quaternion.clone()}; } }
       if(CS.phase === "out"){ CS.k = Math.min(1, CS.k + dt/.7); const e = ease(CS.k);
         dummy.position.set(P.x, 1.62, P.z); dummy.rotation.set(P.pitch, P.yaw, 0, "YXZ");
         camera.position.lerpVectors(CS.from.pos, dummy.position, e); camera.quaternion.copy(CS.from.q).slerp(dummy.quaternion, e); if(CS.k >= 1) CS.done(); }
@@ -2793,14 +2837,9 @@ function floorOne(){
       for(let k=0;k<9;k++){ const cx0 = Math.random()*w, cy0 = Math.random()*h*.6, R = S*(.02 + Math.random()*.05);
         for(let j=0;j<14;j++){ const a = Math.random()*6.28, rr = Math.random()*R*2.4; splat.push({x:cx0 + Math.cos(a)*rr, y:cy0 + Math.sin(a)*rr*.8, rx:R*(.15 + Math.random()*.6)*(1 - rr/(R*3)), ry:R*(.1 + Math.random()*.3), rot:a, v:Math.random() < .3 ? S*(.1 + Math.random()*.4) : 0}); } }
       await new Promise(res => { const fr = now => { const k = (now - t0)/1000; c.fillStyle = "#000"; c.fillRect(0, 0, w, h);
-          const split = Math.min(1, k*1.6), sz = S*(1.05 + k*.3);
-          CREATURE.head(c, w/2 + (Math.random()-.5)*14, h*.5 + (Math.random()-.5)*10, sz, {lit:.8, grin:1, tilt:.05, detail:true});
-          const top = h*.5 + sz*.02, bot = h*.5 + sz*.6, open = split*sz*.32;
-          c.fillStyle = "#1a0002"; c.beginPath(); c.moveTo(w/2, top - sz*.05); c.quadraticCurveTo(w/2 - open, (top + bot)/2, w/2 - open*.4, bot + sz*.2); c.lineTo(w/2 + open*.4, bot + sz*.2); c.quadraticCurveTo(w/2 + open, (top + bot)/2, w/2, top - sz*.05); c.fill();
-          const inner = c.createLinearGradient(w/2 - open, 0, w/2 + open, 0); inner.addColorStop(0, "#7a0710"); inner.addColorStop(.5, "#120001"); inner.addColorStop(1, "#7a0710");
-          c.fillStyle = inner; c.beginPath(); c.moveTo(w/2, top); c.quadraticCurveTo(w/2 - open*.8, (top + bot)/2, w/2 - open*.3, bot + sz*.15); c.lineTo(w/2 + open*.3, bot + sz*.15); c.quadraticCurveTo(w/2 + open*.8, (top + bot)/2, w/2, top); c.fill();
-          c.fillStyle = "#d8cfb0"; for(let i=0;i<14;i++){ const u = i/13, y = top + (bot - top)*u, xo = open*.75*Math.sin(u*Math.PI)*.9 + open*.15;
-            for(const s of [-1, 1]){ c.beginPath(); c.moveTo(w/2 + s*xo, y); c.lineTo(w/2 + s*(xo - sz*.05), y + sz*.012); c.lineTo(w/2 + s*xo, y + sz*.03); c.fill(); } }
+          const img = A.tex.lunge.image, zoom = 1.02 + k*.45, iw = Math.max(w, h*img.width/img.height)*zoom, ih = iw*img.height/img.width, shk = (1.4 - k)*16;
+          c.drawImage(img, w/2 - iw/2 + (Math.random() - .5)*shk, h*.45 - ih/2 + (Math.random() - .5)*shk, iw, ih);
+          if(k < .12){ c.fillStyle = "rgba(255,255,255,.55)"; c.fillRect(0, 0, w, h); }
           splat.forEach(s => { c.fillStyle = s.v ? "rgba(70,3,8,.9)" : "rgba(95,5,10,.85)"; c.beginPath(); c.ellipse(s.x, s.y, Math.max(.5, s.rx), Math.max(.5, s.ry), s.rot, 0, 7); c.fill();
             if(s.v){ const run = Math.min(h - s.y, s.v*k); c.fillRect(s.x - s.rx*.25, s.y, Math.max(1, s.rx*.5), run); c.beginPath(); c.ellipse(s.x, s.y + run, s.rx*.35, s.rx*.45, 0, 0, 7); c.fill(); } });
           if(k < 1.4) requestAnimationFrame(fr); else res(); };
@@ -2908,7 +2947,7 @@ function floorOne(){
       /* scripted moments */
       if(!scripted.hint && t > 1.5){ scripted.hint = true; say(touch ? "Left thumb moves. Drag anywhere to look around. LIGHT turns the flashlight on and off. RUN is loud." : "WASD to move. Click and move the mouse to look. F: flashlight. Shift: run (it's loud). E: action.", 8, "n"); }
       if(!scripted.glimpse && (P.z > 7 || t > 25)){ scripted.glimpse = true; C.mode = "script"; C.x = 15; C.z = 11; }
-      if(!scripted.phone && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 7 && !hasCard){ scripted.phone = true; AU.whisper("please hold"); say("Someone is sitting at the desk. She's holding the phone to her ear. She hasn't moved.", 5, "n"); }
+      if(!scripted.phone && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 7 && !hasCard){ scripted.phone = true; AU.whisper("please hold"); say("Someone is standing behind the reception desk. She hasn't moved. She's still wearing her badge.", 5, "n"); }
       for(const m of monitors){ if(!m.said && Math.hypot(m.x - P.x, m.z - P.z) < 2.6){ m.said = true; const lines = [
           "you're awake. good. marisol's office is through the gap at the bottom of this room. she has the elevator card. — s.",
           "it sees the light before it sees you. if it gets close, turn the light off. — s.",
@@ -2961,26 +3000,26 @@ function floorOne(){
       const k = Math.min(1, dt*10); P.cx += (P.x - P.cx)*k; P.cz += (P.z - P.cz)*k; P.cy += (eyeH - P.cy)*Math.min(1, dt*(P.hidden ? 5 : 12));   // crouching under a desk is a movement, not a cut
       if(!CS){ camera.position.set(P.cx, P.cy, P.cz); camera.rotation.set(P.hidden && P.hidden.kind === "desk" ? Math.max(-.5, Math.min(.35, P.pitch)) : P.pitch, P.yaw, 0, "YXZ"); }
       hand.visible = !CS || CS.phase === "in" || CS.phase === "out";
-      hand.position.set(.26 + Math.cos(P.bob*.5)*.012 + P.sway, -.3 + Math.abs(Math.sin(P.bob*.5))*.014 - (P.hidden ? .1 : 0), -.5); hand.rotation.z = P.sway*2;
+      hand.position.set(Math.cos(P.bob*.5)*.012 + P.sway, Math.abs(Math.sin(P.bob*.5))*.014 - (P.hidden ? .1 : 0), 0); hand.rotation.z = P.sway*2;
       dust.visible = fl && !P.hidden; { const pa = dust.geometry.attributes.position; for(let i=0;i<dustN;i++){ pa.array[i*3+1] += Math.sin(time*.3 + i)*.0006 - .0002; if(pa.array[i*3+1] < -.8) pa.array[i*3+1] = .8; } pa.needsUpdate = true; }
-      const on = fl && !P.hidden; flash.intensity = on ? 1.6*flick*(P.bat < .25 ? .35 + P.bat*2.6 : 1) : 0; lens.material.color.set(on ? 0xfff2d0 : 0x222222);
-      drips.forEach((dd, i) => { const k = ((time*.3 + i*.33) % 1); dd.scale.y = .02 + k*.2; dd.position.y = -.06 - k*.1; });
+      const on = fl && !P.hidden; flash.intensity = on ? 2.1*flick*(P.bat < .25 ? .35 + P.bat*2.6 : 1) : 0; if(handMat) handMat.emissiveIntensity = on ? 1 : 0;
+      drips.forEach((dd, i) => { const k = ((time*.3 + i*.33) % 1); dd.scale.y = .02 + k*.2; dd.position.y = -.1 - k*.1; });
       updateHand();
       /* the creature in the world */
       const d = Math.hypot(C.x - P.x, C.z - P.z);
-      CR.position.set(C.x, 0, C.z); CR.rotation.y = C.yaw; poseCreature(C.mode, dt, d);
-      CR.updateMatrixWorld(true); face.lookAt(camera.getWorldPosition(tmp));   // its face always turns to you
-      eyes.forEach(e => e.visible = C.mode !== "hidden" && (C.mode === "hunt" || d < 18));
+      poseCreature(C.mode, dt, d); CR.position.set(C.x, crY, C.z); CR.rotation.y = C.yaw;
       /* lights stutter when it is near them */
-      if(surge > 0) surge -= dt; hemi.intensity = surge > 0 ? .22 + surge*.5 : .22;
+      if(surge > 0) surge -= dt; hemi.intensity = surge > 0 ? .34 + surge*.5 : .34;
       racks.forEach((r, i) => { r.material.emissiveIntensity = .4 + (Math.sin(time*7 + i*2) > .6 ? .4 : 0); });
       for(const L of LIGHTS){ const ld = Math.hypot(L.position.x - C.x, L.position.z - C.z); L.intensity = surge > 0 ? L.base*3 : L.base*(ld < 6 && Math.random() < .3 ? Math.random()*.3 : (Math.sin(time*13 + L.position.x) > -.85 ? 1 : .3));
         if(L.panel) L.panel.material.emissiveIntensity = .8*L.intensity/L.base; }
-      for(const m of monitors){ if(m.screen){ const md2 = Math.hypot(m.x - C.x, m.z - C.z); m.screen.material.color.setScalar(md2 < 5 && Math.random() < .35 ? .05 : 1); } }
+      for(const m of monitors){ if(m.screen && !(scripted.mirror && scripted.mirror.t >= 0 && m === mirrorDesk)){ const md2 = Math.hypot(m.x - C.x, m.z - C.z); m.screen.material.color.setScalar(md2 < 5 && Math.random() < .35 ? .05 : 1); } }
       if(scripted.mirror && scripted.mirror.t >= 0){ const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw); me.position.set(P.x, 0, P.z); me.rotation.y = P.yaw;
-        camB.position.set(P.x + fx*2.3, 2.45, P.z + fz*2.3); camB.lookAt(P.x - fx*.5, 1.45, P.z - fz*.5); face.lookAt(camB.position); irLight.position.copy(camB.position); irLight.intensity = 2.6; const fI = flash.intensity; flash.intensity = 0; const fogD = scene.fog.density; scene.fog.density = .03;
-        renderer.setRenderTarget(rt); renderer.render(scene, camB); renderer.setRenderTarget(null); irLight.intensity = 0; face.lookAt(camera.getWorldPosition(tmp)); flash.intensity = fI; scene.fog.density = fogD; }
-      renderer.render(scene, camera);
+        camB.position.set(P.x + fx*2.3, 2.45, P.z + fz*2.3); camB.lookAt(P.x - fx*.5, 1.45, P.z - fz*.5); irLight.position.copy(camB.position); irLight.intensity = 2.6; const fI = flash.intensity; flash.intensity = 0; const fogD = scene.fog.density; scene.fog.density = .03;
+        renderer.setRenderTarget(rt); renderer.render(scene, camB); renderer.setRenderTarget(null); irLight.intensity = 0; flash.intensity = fI; scene.fog.density = fogD; }
+      const fearV = C.mode !== "script" && C.mode !== "hidden" ? Math.max(0, 1 - d/9) : 0, U = postMat.uniforms;
+      U.time.value = time % 100; U.fear.value += (fearV - U.fear.value)*Math.min(1, dt*4); U.hurt.value = Math.max(0, U.hurt.value - dt*.7); U.flashW.value = Math.max(0, U.flashW.value - dt*1.5);
+      renderer.setRenderTarget(rtMain); renderer.render(scene, camera); renderer.setRenderTarget(null); renderer.render(postScene, postCam);
       drawHud(dt, d);
     }
     function drawHud(dt, d){
@@ -3024,9 +3063,9 @@ function floorOne(){
       removeEventListener("keydown", kd); removeEventListener("keyup", ku); removeEventListener("resize", fit);
       cv.removeEventListener("mousedown", md); removeEventListener("mousemove", mm); removeEventListener("mouseup", mu);
       try{ document.exitPointerLock && document.exitPointerLock(); }catch(e){}
-      ui.remove(); hud.remove(); renderer.dispose(); cv.remove(); AU.breath(false); AU.heartbeat(0); document.body.classList.remove("floor");
+      ui.remove(); hud.remove(); rtMain.dispose(); renderer.dispose(); cv.remove(); AU.breath(false); AU.heartbeat(0); document.body.classList.remove("floor");
     }
-    DEV.f1 = { P, C, stick, action: () => action(), caught: () => getCaught(), get t(){ return t; }, get hasCard(){ return hasCard; }, get objective(){ return objective; }, get CS(){ return CS; }, renderer, doors, items, lockers, scripted, get powered(){ return powered; }, throwItem: () => throwItem(), get breaker(){ return breaker; }, mirrorDesk, phoneAt };   // test hook
+    DEV.f1 = { P, C, stick, action: () => action(), caught: () => getCaught(), get t(){ return t; }, get hasCard(){ return hasCard; }, get objective(){ return objective; }, get CS(){ return CS; }, renderer, doors, items, lockers, scripted, get powered(){ return powered; }, throwItem: () => throwItem(), get breaker(){ return breaker; }, mirrorDesk, phoneAt, NOTES, showNote, post:postMat, rt:rtMain };   // test hook
     requestAnimationFrame(frame);
   });
 }
