@@ -2391,7 +2391,7 @@ function floorOne(){
     const MW = F1MAP[0].length, MH = F1MAP.length, grid = [], desks = [], monitors = [], doors = [], props = [], doorMap = new Map();
     let start = {x:1, z:1}, marisolAt = null, elev = null;
     for(let y=0;y<MH;y++){ grid.push([]); for(let x=0;x<MW;x++){ const ch = F1MAP[y][x];
-      grid[y].push(ch === "#" ? 1 : ch === "E" ? 2 : ch === "D" ? 4 : "dkmpvftrBL".includes(ch) ? 3 : 0);
+      grid[y].push(ch === "#" ? 1 : ch === "E" ? 2 : ch === "D" ? 4 : "dkmpvftrL".includes(ch) ? 3 : 0);   // the breaker is on the wall: you can walk right up to it
       if(ch === "D") doors.push({gx:x, gy:y, t:0, target:0}); if("vftrBL".includes(ch)) props.push({ch, gx:x, gy:y, x:x*CELL + 1, z:y*CELL + 1});
       const wx = x*CELL + CELL/2, wz = y*CELL + CELL/2;
       if(ch === "S") start = {x:wx, z:wz};
@@ -2449,7 +2449,7 @@ function floorOne(){
     const flash = new T.SpotLight(0xfff0d8, 2.1, 26, .5, .6, 1.7); flash.castShadow = true; flash.shadow.mapSize.set(512, 512); flash.shadow.camera.near = .2; flash.shadow.bias = -.0004;
     flash.position.set(.24, -.24, -.68); camera.add(flash); const flashT = new T.Object3D(); flashT.position.set(0, -.05, -3); camera.add(flashT); flash.target = flashT;
     const pl = (col, i, d, x, y, z) => { const l = new T.PointLight(col, i, d, 2); l.position.set(x, y, z); l.base = i; scene.add(l); return l; };
-    const LIGHTS = [pl(0xff2a1a, 1.4, 9, 40.6, 2.6, 28.6), pl(0xff2a1a, 1.1, 8, 23, 2.7, 17.2), pl(0xffd8a0, .9, 6, 5.6, 1.4, 18.4), pl(0x60ffa8, .7, 5, 7, 1.3, 4.6)];
+    const LIGHTS = [pl(0xff3a2a, .55, 7, 40.2, 2.6, 27.6), pl(0xff3a2a, .5, 6, 23, 2.7, 17.2), pl(0xffd8a0, .9, 6, 5.6, 1.4, 18.4), pl(0x60ffa8, .7, 5, 7, 1.3, 4.6)];
     for(const [x, z, ry] of [[40.6, 27.6, -Math.PI/2], [23, 16.6, 0]]){ const s = new T.Mesh(new T.PlaneGeometry(.62, .26), new T.MeshBasicMaterial({map:A.tex.exit})); s.position.set(x - (ry ? .55 : 0), 2.75, z + (ry ? 0 : .5)); s.rotation.y = ry; scene.add(s); }
 
     /* ---------- the clutter of a place people left in a hurry ---------- */
@@ -2576,8 +2576,8 @@ function floorOne(){
     const crG = A.glb.creature.scene; CR.add(crG); const bones = {}; let crMat = null;
     crG.traverse(o => { if(o.isBone){ bones[o.name] = o; if(!o.userData.rest) o.userData.rest = o.quaternion.clone(); }
       if(o.isMesh){ o.castShadow = true; o.frustumCulled = false;
-        if(o.material.name && o.material.name.startsWith("cursor")){ const ct = A.tex.cursor.clone(); ct.flipY = false; ct.needsUpdate = true; o.material = new T.MeshStandardMaterial({map:ct, alphaTest:.5, side:T.DoubleSide, roughness:.4}); }
-        else if(o.material.isMeshStandardMaterial){ crMat = o.material; crMat.color.setRGB(1.45, 1.3, 1.25); crMat.roughness = .42; crMat.emissive.setRGB(1, 1, 1); } } });
+        if(o.material.name && o.material.name.startsWith("cursor")){ const ct = A.tex.cursor.clone(); ct.flipY = false; ct.needsUpdate = true; o.material = new T.MeshStandardMaterial({map:ct, alphaTest:.5, side:T.DoubleSide, roughness:.4, skinning:!!o.isSkinnedMesh}); }
+        else if(o.material.isMeshStandardMaterial){ crMat = o.material; if(o.isSkinnedMesh) crMat.skinning = true; crMat.color.setRGB(1.45, 1.3, 1.25); crMat.roughness = .42; crMat.emissive.setRGB(1, 1, 1); } } });
     const crGlow = new T.PointLight(0xff4a30, 1.2, 4.5, 1.6); crGlow.position.set(0, 2.1, .9); CR.add(crGlow);   // the light from its throat: you see it before it's on you
     const qd = new T.Quaternion(), ed = new T.Euler();
     const setB = (n, x, y=0, z=0) => { const b = bones[n]; if(!b) return; ed.set(x, y, z); qd.setFromEuler(ed); b.quaternion.copy(b.userData.rest).multiply(qd); };
@@ -2642,7 +2642,7 @@ function floorOne(){
     { const bt = new T.Mesh(new T.CylinderGeometry(.15, .15, .42, 16), new T.MeshStandardMaterial({color:0x6a8ab0, transparent:true, opacity:.55, roughness:.1})); bt.position.set(14.25, 1.22, 23); scene.add(bt); }
     for(const [x, z] of [[24, 7], [12, 3], [30, 21], [33, 27]]){ const v = new T.Mesh(new T.PlaneGeometry(.6, .6), new T.MeshStandardMaterial({map:A.tex.vent, roughness:.6})); v.rotation.x = Math.PI/2; v.position.set(x, WH - .01, z); scene.add(v); }
     const NOTES = [{key:"note_it", x:7.3, y:.8, z:5.15, w:.3, h:.2, label:"READ THE NOTE"}, {key:"memo", x:23.2, y:.8, z:9.1, w:.22, h:.28, label:"READ THE MEMO"},
-      {key:"note_mar", x:4.2, y:.012, z:16.2, w:.25, h:.27, label:"READ THE NOTE"}, {key:"note_elev", x:32.6, y:.012, z:21.4, w:.3, h:.2, label:"READ THE NOTE"},
+      {key:"note_mar", x:2.8, y:.012, z:21.6, w:.25, h:.27, label:"READ THE NOTE"}, {key:"note_elev", x:28.4, y:.012, z:22.6, w:.3, h:.2, label:"READ THE NOTE"},
       {key:"badge_evan", x:31.6, y:.012, z:22.9, w:.15, h:.1, label:"LOOK AT THE BADGE"}];
     for(const n of NOTES){ const m = new T.Mesh(new T.PlaneGeometry(n.w, n.h), new T.MeshStandardMaterial({map:A.tex[n.key], roughness:.85, emissive:0x30302a})); m.rotation.set(-Math.PI/2, 0, (n.x*7) % 1 - .5); m.position.set(n.x, n.y + .004, n.z); scene.add(m); n.mesh = m; }
     const nearNote = () => NOTES.find(n => Math.hypot(n.x - P.x, n.z - P.z) < 1.3);
@@ -2658,7 +2658,7 @@ function floorOne(){
     const WAY = [[10,3],[19,3],[19,7],[9,7],[8,10],[9,13],[19,13],[14,10],[19,10],[8,5],[3,9],[3,13],[15,13]].map(([x,y]) => [x*CELL+1, y*CELL+1]);
     const C = {x:39, z:27, mode:"hidden", path:[], pt:0, tgt:null, wi:0, step:0, lastX:0, lastZ:0, searchT:0, grace:0, yaw:0};
     let fl = true, flick = 1, flickT = 0, t = 0, hasCard = false, checkpoint = {x:P.x, z:P.z, yaw:P.yaw}, caught = false, done = false, paused = false;
-    let sub = null, subT = 0, objective = "Find Marisol's office. It's through the gap at the bottom of this room.";
+    let sub = null, subT = 0, objective = "Find Marisol. Her office is through the door at the bottom of this room. Follow the green arrow.";
     const scripted = {glimpse:false, phone:false, printer:false, hint:false, elevCalled:0, elevOpen:false, elevSent:false, mirror:null, phone2:null, batDead:false};
     let powered = false, surge = 0;
     const marks = [];   // where sounds came from, drawn at the edge of the screen
@@ -2743,8 +2743,8 @@ function floorOne(){
     const context = () => {
       if(caught || done || paused) return null;
       if(P.hidden) return P.hidden.kind === "locker" ? "LEAVE THE LOCKER" : "LEAVE THE DESK";
-      if(!hasCard && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 2.2) return "TAKE HER BADGE";
-      if(breaker && hasCard && !powered && Math.hypot(breaker.x - P.x, breaker.z - P.z) < 1.9) return "FLIP THE BREAKER";
+      if(!hasCard && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 3.0) return "TAKE HER BADGE";
+      if(breaker && hasCard && !powered && Math.hypot(breaker.x - P.x, breaker.z - P.z) < 2.0) return "FLIP THE BREAKER";
       if(Math.hypot(ex - 1 - P.x, ez - P.z) < 2.4 && !scripted.elevOpen && !scripted.elevCalled) return "CALL THE ELEVATOR";
       { const n = nearNote(); if(n) return n.label; }
       const it = nearItem(); if(it) return it.kind === "battery" ? "TAKE THE BATTERY" : `PICK UP THE ${it.kind.toUpperCase()}`;
@@ -2805,12 +2805,12 @@ function floorOne(){
       hasCard = true; checkpoint = {x:P.x, z:P.z, yaw:P.yaw}; AU.whisper("thank you for holding");
       say("She whispered something. Then the phone on her desk started ringing.", 5, "n");
       const ring = setInterval(() => { if(!live() || done) return clearInterval(ring); const d = Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z); if(d < 14) AU.tone(1180, "square", .005, .05/(1 + d*.2), .25); }, 900);
-      setTimeout(() => { if(!live()) return; AU.stinger(); say("it heard that. it's coming to look. get to the elevator: end of the bottom corridor, on the right. — s.", 7);
-        setObj("Get to the elevator: end of the bottom corridor, on the right."); C.mode = "investigate"; C.tgt = [Math.floor(marisolAt.x/CELL), Math.floor(marisolAt.z/CELL)]; C.grace = 1.5; C.x = 25; C.z = 27; C.path = []; }, 2200);
+      setTimeout(() => { if(!live()) return; AU.stinger(); say("it heard that. it's coming here to look. leave now. the elevator has no power: flip the breaker in the server room first. — s.", 7);
+        setObj("Flip the breaker in the server room (follow the arrow). The elevator has no power yet."); C.mode = "investigate"; C.tgt = [Math.floor(marisolAt.x/CELL), Math.floor(marisolAt.z/CELL)]; C.grace = 1.5; C.x = 25; C.z = 5; C.path = []; }, 2200);
     }
     const L2W = v => mar.localToWorld(v.clone());
     function cardScene(dt){
-      const camT = L2W(new T.Vector3(.05, 1.3, .6)), lookCard = L2W(MR.cardRest.clone().add(new T.Vector3(0, .05, 0))), lookFace = L2W(new T.Vector3(0, 1.5, .05));
+      const camT = L2W(new T.Vector3(.08, 1.45, .85)), lookCard = L2W(MR.cardRest.clone().add(new T.Vector3(0, .2, 0))), lookFace = L2W(new T.Vector3(0, 1.48, .05));
       dummy.position.copy(camT); dummy.lookAt(CS.phase === "snap" || CS.phase === "out" ? lookFace : lookCard);
       const ease = k => k < .5 ? 2*k*k : 1 - Math.pow(-2*k + 2, 2)/2;
       renderer.toneMappingExposure = CS.phase === "out" ? .9 : .8;
@@ -2898,12 +2898,12 @@ function floorOne(){
       if(C.mode === "investigate"){ target = C.tgt; sp = 2.6; if(target && Math.floor(C.x/CELL) === target[0] && Math.floor(C.z/CELL) === target[1]){ C.mode = "search"; C.searchT = 0; } }
       if(C.mode === "hunt"){ target = [Math.floor(C.lastX/CELL), Math.floor(C.lastZ/CELL)]; sp = C.spotT > 0 ? 0 : 2.9; if(C.spotT > 0){ C.spotT -= dt; C.yaw = Math.atan2(P.x - C.x, P.z - C.z); }   // it stops, screams, then comes
         if(see && !P.hidden && d < 12){ C.lastX = P.x; C.lastZ = P.z; C.lostT = 0; } else if((C.lostT = (C.lostT || 0) + dt) > 4){ C.mode = "search"; C.searchT = 0; C.lostT = 0; } else if(Math.floor(C.x/CELL) === target[0] && Math.floor(C.z/CELL) === target[1]){ C.mode = "search"; C.searchT = 0; } }
-      if(C.mode === "check"){ const hx = P.hidden ? (P.hidden.kind === "locker" ? P.hidden.l.x : P.px) : P.x, hz = P.hidden ? (P.hidden.kind === "locker" ? P.hidden.l.z : P.pz) : P.z;
+      if(C.mode === "check"){ const hx = P.hidden ? (P.hidden.kind === "locker" ? P.hidden.l.x + P.hidden.l.face*CELL : P.px) : P.x, hz = P.hidden ? (P.hidden.kind === "locker" ? P.hidden.l.z : P.pz) : P.z;
         target = [Math.floor(hx/CELL), Math.floor(hz/CELL)]; sp = 2.4; if(!P.hidden){ C.mode = "hunt"; C.lastX = P.x; C.lastZ = P.z; } }
       if(C.mode === "search"){ C.searchT += dt; sp = 0; if(Math.random() < dt*1.2) crack(d, ang); if(C.searchT > 3){ C.mode = "patrol"; } }
       if(target && sp){ C.pt -= dt; if(C.pt <= 0 || !C.path.length){ C.pt = .35; C.path = bfs(Math.floor(C.x/CELL), Math.floor(C.z/CELL), target[0], target[1]); }
         let tx, tz, nextDoor = null;
-        if((C.mode === "hunt" || C.mode === "check") && d < 3 && (see || C.mode === "check")){ tx = P.x; tz = P.z; }
+        if(C.mode === "hunt" && !P.hidden && d < 3 && see){ tx = P.x; tz = P.z; }
         else if(C.path.length){ tx = C.path[0][0]*CELL + 1; tz = C.path[0][1]*CELL + 1; nextDoor = doorMap.get(C.path[0][1]*MW + C.path[0][0]); }
         if(nextDoor && nextDoor.t < .85 && Math.hypot(nextDoor.cx - C.x, nextDoor.cz - C.z) < 2.2){                     // a closed door: it tries the handle, then it comes through
           if(!C.doorT){ C.doorT = .001; AU.knock(Math.max(-1, Math.min(1, Math.sin(relAng(nextDoor.cx, nextDoor.cz)))), 2, true); marks.push({ang:relAng(nextDoor.cx, nextDoor.cz), life:1.2, loud:Math.min(1, 2.5/(1 + d*.2)), kind:"crash"}); }
@@ -2912,7 +2912,7 @@ function floorOne(){
         if(tx !== undefined){ const dx = tx - C.x, dz = tz - C.z, dd = Math.hypot(dx, dz); if(dd < .15){ if(C.path.length) C.path.shift(); } else { C.x += dx/dd*sp*dt; C.z += dz/dd*sp*dt; C.yaw = Math.atan2(dx, dz); } } }
       C.step -= dt; if(C.step <= 0 && sp && !C.doorT){ C.step = C.mode === "hunt" ? .28 : C.mode === "check" ? .4 : .62; footstep(d, ang, C.mode === "hunt" || C.mode === "check"); }
       if(Math.random() < dt*.3) crack(d, ang);
-      if(!caught && ((d < 1.0 && (!P.hidden || C.mode === "hunt")) || (P.hidden && C.mode === "check" && d < 1.2))){
+      if(!caught && ((d < 1.0 && (!P.hidden || C.mode === "hunt")) || (P.hidden && C.mode === "check" && d < 2.6 && !P.holding && C.checkT > 1.6))){
         if(P.hidden && P.hidden.kind === "locker"){ AU.hit(); setTimeout(() => {}, 0); }
         getCaught(); }
     }
@@ -2925,6 +2925,7 @@ function floorOne(){
       const dt = Math.min(.05, (now - last)/1000); last = now;
       if(!paused && !caught && !done) update(dt);
       else if(CS){ t += dt; subT -= dt; if(subT <= 0) sub = null; btnAct.style.display = "none"; cardScene(dt); }
+      const cut = paused || caught || !!CS; if(cut !== ui._cut){ ui._cut = cut; ui.querySelectorAll(".stick,.btns,.look").forEach(e => e.style.visibility = cut ? "hidden" : ""); }
       draw(dt, now/1000);
       requestAnimationFrame(frame);
     }
@@ -2961,14 +2962,14 @@ function floorOne(){
       /* scripted moments */
       if(!scripted.hint && t > 1.5){ scripted.hint = true; say(touch ? "Left thumb moves. Drag anywhere to look around. LIGHT turns the flashlight on and off. RUN is loud." : "WASD to move. Click to look with the mouse. E opens doors and uses things. F: flashlight. Shift: run (it's loud). H: show the keys.", 8, "n"); }
       if(!scripted.glimpse && (P.z > 7 || t > 25)){ scripted.glimpse = true; C.mode = "script"; C.x = 15; C.z = 11; }
-      if(!scripted.phone && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 7 && !hasCard){ scripted.phone = true; AU.whisper("please hold"); say("Someone is standing behind the reception desk. She hasn't moved. She's still wearing her badge.", 5, "n"); }
+      if(!scripted.phone && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 7 && !hasCard){ scripted.phone = true; setObj("Take Marisol's badge. Walk up to the reception desk."); AU.whisper("please hold"); say("Someone is standing behind the reception desk. She hasn't moved. She's still wearing her badge.", 5, "n"); }
       for(const m of monitors){ if(!m.said && Math.hypot(m.x - P.x, m.z - P.z) < 2.6){ m.said = true; const lines = [
-          "you're awake. good. marisol's office is through the gap at the bottom of this room. she has the elevator card. — s.",
+          "you're awake. good. marisol is in the office below this one. her badge opens the elevator. — s.",
           "it sees the light before it sees you. if it gets close, turn the light off. — s.",
           "don't run unless you have to. it hears running. — s.",
-          "if it's coming, get under a desk. when it's right next to you, hold your breath. — s.",
+          "if it's coming, get under a desk or into a locker before it sees you. if it saw you go in, hold your breath when it's right there. — s.",
           "listen. you'll hear it before you see it. the marks on the edge of your screen show where the sound came from. — s.",
-          "when it clicks, it's listening. stand completely still until it stops. — s.",
+          "when it clicks, it's listening. don't run until it stops. — s.",
           "you can throw things. mugs, bottles. it goes to the noise. use that. — s.",
           "close doors behind you. it can open them, but you'll hear it try. — s.",
           "if it sees you hide, it knows where you are. hide where it can't see you go. — s."];
@@ -2988,11 +2989,11 @@ function floorOne(){
         if(ph.t <= 0){ ph.t = 1.1; if(AU.ok()){ const an = relAng(phoneAt.x, phoneAt.z); for(let i=0;i<2;i++) setTimeout(() => AU.tone(1320, "square", .005, Math.min(.12, .5/(1 + pd*.4)), .18), i*220); marks.push({ang:an, life:.8, loud:Math.min(1, 2/(1 + pd*.25)), kind:"click"}); } }
         if(pd < 1.7){ ph.ring = false; drawLcd("CALL ENDED"); AU.duck(.8); setTimeout(() => { if(!live()) return; AU.whisper("i'm right behind you"); AU.knock(Math.sin(relAng(P.x + Math.sin(P.yaw)*2, P.z + Math.cos(P.yaw)*2)), 2, true);
           marks.push({ang:Math.PI, life:1.4, loud:1, kind:"step"}); flick = .05; flickT = .4; }, 700); } }
-      if(!scripted.printer && P.x > 34 && P.z < 8){ scripted.printer = true; AU.scrape(); say("A printer in the corner is printing. Every page has your name on it. The later pages are wet.", 5, "n"); }
+      if(!scripted.printer && P.x > 34 && P.z < 8){ scripted.printer = true; AU.scrape(); say("The copier in the corner is printing. Every page has your name on it. The later pages are wet.", 5, "n"); }
       if(scripted.elevCalled && !scripted.elevOpen){ const left = 9 - (t - scripted.elevCalled);
         drawInd(["B2","B1","G","1","2","3","4","5","6","7","8","9"][Math.max(0, Math.min(11, Math.floor((9 - left)/9*11)))]);
-        if(left < 5 && C.mode !== "hunt" && !scripted.elevSent){ scripted.elevSent = true; C.x = 5; C.z = 27; C.mode = "investigate"; C.tgt = [elev.gx - 1, elev.gy]; C.grace = 0; C.path = []; AU.knock(-.9, 3, true);
-          say("something is coming down the corridor. turn your light off. stay still. — s.", 6); }
+        if(left < 5 && C.mode !== "hunt" && !scripted.elevSent){ scripted.elevSent = true; C.x = 5; C.z = 27; C.mode = "investigate"; C.tgt = [elev.gx - 7, elev.gy]; C.grace = 0; C.path = []; AU.knock(-.9, 3, true);
+          say("something is coming down the corridor. turn your light off and don't move. it'll stop and listen, then go. — s.", 6); }
         if(left <= 0){ scripted.elevOpen = true; grid[elev.gy][elev.gx] = 0; AU.chime(); inside.intensity = 1.8; setObj("Get in."); say("The doors open.", 3, "n"); } }
       if(scripted.elevOpen){ doorL.position.z = Math.max(ez - 1.4, doorL.position.z - dt*1.2); doorR.position.z = Math.min(ez + 1.4, doorR.position.z + dt*1.2); }
       if(scripted.elevOpen && P.x > ex + .4){ done = true; finish(); }
@@ -3001,9 +3002,12 @@ function floorOne(){
       AU.heartbeat(active && d < 16 ? Math.round(60 + (16 - d)*6) : 0);
       if(active && d < 4.5) AU.breath(true); else if(d > 7) AU.breath(false);
       if(P.hidden){
-        const close = active && d < 2.8; btnBreath.style.display = close || P.holding ? "block" : "none";
-        if(P.holding){ P.breath -= dt/5; if(P.breath <= 0){ P.holding = false; P.breath = 0; AU.tone(300, "sawtooth", .01, .12, .3, 0); say("You gasp.", 2, "n"); C.sawHide = true; } }
-        else { P.breath = Math.min(1, P.breath + dt/3); if(false){ heardT = 2; if(Math.random() < .3){ say("It heard you breathing.", 2, "n"); C.sawHide = true; } } }
+        const close = active && d < 3.5 && (C.mode === "check" || C.sawHide); btnBreath.style.display = close || P.holding ? "block" : "none";
+        if(close && !scripted.breathTip){ scripted.breathTip = true; say(touch ? "It saw you hide. HOLD the red button to hold your breath until it leaves." : "It saw you hide. Hold SPACE to hold your breath until it leaves.", 4, "n"); }
+        if(P.holding){ P.breath -= dt/7; if(P.breath <= 0){ P.holding = false; P.breath = 0; AU.tone(300, "sawtooth", .01, .12, .3, 0); say("You gasp.", 2, "n"); if(close) C.sawHide = true; } }
+        else P.breath = Math.min(1, P.breath + dt/3);
+        if(C.mode === "check" && d < 2.6){ C.checkT = (C.checkT || 0) + dt; if(P.holding && C.checkT > 1.6){ C.sawHide = false; C.checkT = 0; C.mode = "search"; C.searchT = 0; AU.whisper("where"); say("It's sniffing the air... it can't hear you. It's leaving.", 3, "n"); } }
+        else C.checkT = 0;
         heardT -= dt;
       } else btnBreath.style.display = "none";
       const label = context(); btnAct.style.display = label ? "block" : "none"; btnAct.textContent = label ? label + (keyboard || !touch ? "  [E]" : "") : "";
@@ -3015,7 +3019,8 @@ function floorOne(){
       const k = Math.min(1, dt*10); P.cx += (P.x - P.cx)*k; P.cz += (P.z - P.cz)*k; P.cy += (eyeH - P.cy)*Math.min(1, dt*(P.hidden ? 5 : 12));   // crouching under a desk is a movement, not a cut
       if(!CS){ camera.position.set(P.cx, P.cy, P.cz); camera.rotation.set(P.hidden && P.hidden.kind === "desk" ? Math.max(-.5, Math.min(.35, P.pitch)) : P.pitch, P.yaw, 0, "YXZ"); }
       hand.visible = !CS || CS.phase === "in" || CS.phase === "out";
-      hand.position.set(Math.cos(P.bob*.5)*.012 + P.sway, Math.abs(Math.sin(P.bob*.5))*.014 - (P.hidden ? .1 : 0), 0); hand.rotation.z = P.sway*2;
+      const narrow = Math.max(0, 1.6 - W/H);   // iPad-shaped screens: tuck the hand lower and further right
+      hand.position.set(Math.cos(P.bob*.5)*.012 + P.sway + narrow*.05, Math.abs(Math.sin(P.bob*.5))*.014 - (P.hidden ? .1 : 0) - narrow*.06, 0); hand.rotation.z = P.sway*2;
       dust.visible = fl && !P.hidden; { const pa = dust.geometry.attributes.position; for(let i=0;i<dustN;i++){ pa.array[i*3+1] += Math.sin(time*.3 + i)*.0006 - .0002; if(pa.array[i*3+1] < -.8) pa.array[i*3+1] = .8; } pa.needsUpdate = true; }
       const on = fl && !P.hidden; flash.intensity = on ? 2.1*flick*(P.bat < .25 ? .35 + P.bat*2.6 : 1) : 0; if(handMat) handMat.emissiveIntensity = on ? 1 : 0;
       drips.forEach((dd, i) => { const k = ((time*.3 + i*.33) % 1); dd.scale.y = .02 + k*.2; dd.position.y = -.1 - k*.1; });
@@ -3066,7 +3071,7 @@ function floorOne(){
       c.textAlign = "right"; c.fillStyle = "#cfc6c0"; c.fillText(fullName().toUpperCase(), W - 18, 34);
       if(P.hidden && P.hidden.kind === "locker"){ c.fillStyle = "rgba(3,3,4,.97)"; let y = 0; const gap = Math.max(10, H*.03); c.fillRect(0, 0, W, H*.32); c.fillRect(0, H*.68, W, H*.32);
         for(y = H*.32; y < H*.68; y += gap*2.2) c.fillRect(0, y + gap, W, gap*1.2); c.fillRect(0, 0, W*.12, H); c.fillRect(W*.88, 0, W*.12, H); }
-      if(C.mode === "listen" && d < 16){ c.textAlign = "center"; c.fillStyle = `rgba(255,120,130,${.5 + Math.random()*.4})`; c.font = "600 13px ui-monospace,monospace"; c.fillText("· click · click · click ·", W/2, 70); }
+      if(C.mode === "listen" && d < 16){ c.textAlign = "center"; c.fillStyle = `rgba(255,120,130,${.5 + Math.random()*.4})`; c.font = "600 13px ui-monospace,monospace"; c.fillText("· click · click · click ·  it's listening", W/2, 146); }
       c.textAlign = "left"; c.font = "600 11px ui-monospace,monospace"; c.fillStyle = "rgba(0,0,0,.5)"; c.fillRect(14, 50, 150, 18);
       c.fillStyle = P.bat < .25 ? "#ff5e7a" : "#cfc6c0"; c.fillText("LIGHT", 20, 63); c.fillStyle = "rgba(255,255,255,.15)"; c.fillRect(62, 55, 94, 8); c.fillStyle = P.bat < .25 ? "#ff2d55" : "#e9d79a"; c.fillRect(62, 55, 94*P.bat, 8);
       if(P.held){ c.fillStyle = "rgba(0,0,0,.5)"; c.fillRect(14, 72, 200, 18); c.fillStyle = "#ffe9a8"; c.fillText(`HOLDING: ${P.held.kind.toUpperCase()}${touch ? "" : "  (R to throw)"}`, 20, 85); }
@@ -3095,7 +3100,7 @@ function floorOne(){
       try{ document.exitPointerLock && document.exitPointerLock(); }catch(e){}
       ui.remove(); hud.remove(); rtMain.dispose(); renderer.dispose(); cv.remove(); AU.breath(false); AU.heartbeat(0); document.body.classList.remove("floor");
     }
-    DEV.f1 = { P, C, stick, action: () => action(), caught: () => getCaught(), get t(){ return t; }, get hasCard(){ return hasCard; }, get objective(){ return objective; }, get CS(){ return CS; }, renderer, doors, items, lockers, scripted, get powered(){ return powered; }, throwItem: () => throwItem(), get breaker(){ return breaker; }, mirrorDesk, phoneAt, NOTES, showNote, post:postMat, rt:rtMain, lunge:LUNGE };   // test hook
+    DEV.f1 = { P, C, stick, action: () => action(), caught: () => getCaught(), get t(){ return t; }, get hasCard(){ return hasCard; }, get objective(){ return objective; }, get CS(){ return CS; }, renderer, doors, items, lockers, scripted, get powered(){ return powered; }, throwItem: () => throwItem(), get breaker(){ return breaker; }, mirrorDesk, phoneAt, NOTES, showNote, post:postMat, rt:rtMain, lunge:LUNGE, scene, camera, get paused(){ return paused; }, setPaused(v){ paused = v; }, get sub(){ return sub && sub.txt; }, get label(){ return context(); }, get fl(){ return fl; } };   // test hook
     requestAnimationFrame(frame);
   });
 }
