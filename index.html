@@ -2326,7 +2326,12 @@ function floorOne(){
   return new Promise(async resolve => {
     const live = newLayer();
     state.layer = 10; state.act = 2; DREAD.install(); SHADOW.off(); NAMEBAR.hide(); RULES.hide(); SCARE.atmosphere(false);
-    render(`<div style="min-height:100vh;display:grid;place-content:end center;padding-bottom:12vh;font-family:var(--mono);color:#7dffb0;letter-spacing:.2em;background:#000 url(assets/f9/title.jpg) center/cover no-repeat"><div style="background:rgba(0,0,0,.6);padding:10px 18px;text-align:center">LOADING FLOOR 9… <span id="f9pct">0%</span><div style="margin-top:8px;height:3px;background:#1a2a20"><div id="f9bar" style="height:3px;width:0;background:#7dffb0"></div></div></div></div>`);
+    render(`<style>@keyframes f9flick{0%,93%,100%{opacity:1}94%{opacity:.55}96%{opacity:.9}97%{opacity:.4}} @keyframes f9roll{to{background-position:0 6px}}</style>
+      <div style="position:fixed;inset:0;background:#000">
+        <div style="position:absolute;inset:0;background:#000 url(assets/f9/title_ps1.png) center/cover no-repeat;image-rendering:pixelated;animation:f9flick 5s steps(1) infinite"></div>
+        <div style="position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.35) 0 1px,transparent 1px 3px);animation:f9roll .4s linear infinite"></div>
+        <div style="position:absolute;left:0;right:0;bottom:calc(9vh + env(safe-area-inset-bottom,0px));text-align:center;font:600 13px var(--mono);letter-spacing:.3em;color:#7dffb0;text-shadow:0 0 8px rgba(125,255,176,.5)">
+          FLOOR 9 · LOADING <span id="f9pct">0%</span><div style="margin:10px auto 0;width:min(260px,60vw);height:2px;background:#0f2216"><div id="f9bar" style="height:2px;width:0;background:#7dffb0"></div></div></div></div>`);
     document.body.className = "floor"; document.body.style.background = "#000"; tab("Nimbus — floor 9", "🔦");
     const ok = await loadThree();
     if(!live()) return;
@@ -2653,12 +2658,13 @@ function floorOne(){
     const scripted = {glimpse:false, phone:false, printer:false, hint:false, elevCalled:0, elevOpen:false, elevSent:false, mirror:null, phone2:null, batDead:false};
     let powered = false, surge = 0;
     const marks = [];   // where sounds came from, drawn at the edge of the screen
+    let keyboard = false, lastKb = null, showKeys = 0;   // a keyboard was used: show keys on the buttons
     const say = (txt, sec=4.5, who="s") => { sub = {txt, who}; subT = sec; };
     const setObj = txt => { objective = txt; AU.notif(); };
 
     /* ---------- input ---------- */
     const K = {}; let lookDX = 0, lookDY = 0, dragging = null;
-    const kd = e => { const k = e.key.toLowerCase(); K[k] = true; if(k === "f") toggleLight(); if(k === "e") action(); if(k === "r") throwItem(); if(k === " "){ e.preventDefault(); P.holding = true; }
+    const kd = e => { const k = e.key.toLowerCase(); K[k] = true; if(k === "f") toggleLight(); if(k === "e" || k === "enter") action(); if(k === "h") showKeys = showKeys > 0 ? 0 : 999; keyboard = true; if(k === "r") throwItem(); if(k === " "){ e.preventDefault(); P.holding = true; }
       if(["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"," "].includes(k)) e.preventDefault(); };
     const ku = e => { const k = e.key.toLowerCase(); K[k] = false; if(k === " ") P.holding = false; };
     addEventListener("keydown", kd); addEventListener("keyup", ku);
@@ -2945,7 +2951,7 @@ function floorOne(){
       if(P.hidden && P.hidden.kind === "locker"){ P.tyaw = Math.max(P.lockYaw - .45, Math.min(P.lockYaw + .45, P.tyaw)); P.tpitch = Math.max(-.3, Math.min(.3, P.tpitch)); }
       creature(dt);
       /* scripted moments */
-      if(!scripted.hint && t > 1.5){ scripted.hint = true; say(touch ? "Left thumb moves. Drag anywhere to look around. LIGHT turns the flashlight on and off. RUN is loud." : "WASD to move. Click and move the mouse to look. F: flashlight. Shift: run (it's loud). E: action.", 8, "n"); }
+      if(!scripted.hint && t > 1.5){ scripted.hint = true; say(touch ? "Left thumb moves. Drag anywhere to look around. LIGHT turns the flashlight on and off. RUN is loud." : "WASD to move. Click to look with the mouse. E opens doors and uses things. F: flashlight. Shift: run (it's loud). H: show the keys.", 8, "n"); }
       if(!scripted.glimpse && (P.z > 7 || t > 25)){ scripted.glimpse = true; C.mode = "script"; C.x = 15; C.z = 11; }
       if(!scripted.phone && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 7 && !hasCard){ scripted.phone = true; AU.whisper("please hold"); say("Someone is standing behind the reception desk. She hasn't moved. She's still wearing her badge.", 5, "n"); }
       for(const m of monitors){ if(!m.said && Math.hypot(m.x - P.x, m.z - P.z) < 2.6){ m.said = true; const lines = [
@@ -2992,7 +2998,8 @@ function floorOne(){
         else { P.breath = Math.min(1, P.breath + dt/3); if(close && heardT <= 0 && C.mode !== "behind"){ heardT = 1.2; if(Math.random() < .55){ say("It heard you breathing.", 2, "n"); C.sawHide = true; } } }
         heardT -= dt;
       } else btnBreath.style.display = "none";
-      const label = context(); btnAct.style.display = label ? "block" : "none"; btnAct.textContent = label || "";
+      const label = context(); btnAct.style.display = label ? "block" : "none"; btnAct.textContent = label ? label + (keyboard || !touch ? "  [E]" : "") : "";
+      if(keyboard !== lastKb){ lastKb = keyboard; if(keyboard || !touch){ btnThrow.textContent = "THROW [R]"; btnBreath.textContent = "HOLD [SPACE] TO HOLD YOUR BREATH"; if(btnLight) btnLight.textContent = "LIGHT [F]"; if(btnRun) btnRun.textContent = "RUN [SHIFT]"; } }
     }
     function draw(dt, time){
       const eyeH = P.hidden ? (P.hidden.kind === "locker" ? 1.55 : .55) : 1.62 + Math.sin(P.bob)*.025;
@@ -3048,6 +3055,8 @@ function floorOne(){
       if(CS && CS.phase === "pull"){ c.textAlign = "center"; c.fillStyle = "#ffd2d8"; c.font = "600 15px ui-monospace,monospace";
         c.fillText(touch ? "PRESS AND HOLD ANYWHERE TO PULL THE CARD" : "HOLD THE MOUSE BUTTON (OR SPACE) TO PULL THE CARD", W/2, H - 52);
         c.fillStyle = "rgba(255,45,85,.25)"; c.fillRect(W*.3, H - 36, W*.4, 6); c.fillStyle = "#ff2d55"; c.fillRect(W*.3, H - 36, W*.4*CS.p, 6); }
+      if((keyboard || !touch) && (t < 25 || showKeys > 0)){ showKeys -= dt; c.textAlign = "left"; c.font = "600 11px ui-monospace,monospace"; const KL = ["W A S D   move", "MOUSE      look (click first)", "E / ENTER  use: doors, hide, pick up, read", "F          flashlight", "R          throw what you're holding", "SHIFT      run (it hears you)", "SPACE      hold your breath (hiding)", "H          show / hide these keys"];
+        const y0 = H - 24 - KL.length*15; c.fillStyle = "rgba(0,0,0,.55)"; c.fillRect(12, y0 - 16, 290, KL.length*15 + 10); c.fillStyle = "#cfc6c0"; KL.forEach((l, i) => c.fillText(l, 20, y0 + i*15)); }
       if(!touch && !document.pointerLockElement && t < 20){ c.textAlign = "center"; c.fillStyle = "rgba(233,226,216,.7)"; c.font = "12px ui-monospace,monospace"; c.fillText("click to look around with the mouse", W/2, H - 24); }
       if(sub){ c.textAlign = "center"; c.font = `${sub.who === "s" ? "500" : "italic 500"} ${W < 700 ? 14 : 17}px ${sub.who === "s" ? "ui-monospace,Menlo,monospace" : "Georgia,serif"}`;
         const words = sub.txt.split(" "), lines = []; let ln = ""; for(const w2 of words){ const tst = ln + w2 + " "; if(c.measureText(tst).width > W*.7 && ln){ lines.push(ln); ln = w2 + " "; } else ln = tst; } lines.push(ln);
