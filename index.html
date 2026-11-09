@@ -2442,7 +2442,7 @@ function floorOne(){
     wdecal(mHands[5], .9, .55, 41.98, 1.2, 27.3, -Math.PI/2); wdecal(mHands[4], .5, .6, 2.02, 1.4, 19.2, Math.PI/2);
     wdecal(goreM("words"), 2.6, 1.7, 29, 1.65, 15.98, Math.PI);                                                                                // IT SEES YOU LOGGED IN
     /* the plant */
-    { const cp = box(.75, 1.15, .7, new T.MeshStandardMaterial({color:0x6a6458, roughness:.6}), 41.4, .575, 5); photo("copier", .66, 1.02, 41.4 - .36, .56, 5, -Math.PI/2); }   // the copier that won't stop
+    { const cp = box(.75, 1.15, .7, new T.MeshStandardMaterial({color:0x6a6458, roughness:.6}), 41.4, .575, 5); photo("copier", .66, 1.02, 41.4 - .4, .56, 5, -Math.PI/2); }   // the copier that won't stop
 
     /* ---------- lights ---------- */
     const hemi = new T.HemisphereLight(0x262a38, 0x0a0806, .34); scene.add(hemi);
@@ -2642,14 +2642,16 @@ function floorOne(){
     { const bt = new T.Mesh(new T.CylinderGeometry(.15, .15, .42, 16), new T.MeshStandardMaterial({color:0x6a8ab0, transparent:true, opacity:.55, roughness:.1})); bt.position.set(14.25, 1.22, 23); scene.add(bt); }
     for(const [x, z] of [[24, 7], [12, 3], [30, 21], [33, 27]]){ const v = new T.Mesh(new T.PlaneGeometry(.6, .6), new T.MeshStandardMaterial({map:A.tex.vent, roughness:.6})); v.rotation.x = Math.PI/2; v.position.set(x, WH - .01, z); scene.add(v); }
     const NOTES = [{key:"note_it", x:7.3, y:.8, z:5.15, w:.3, h:.2, label:"READ THE NOTE"}, {key:"memo", x:23.2, y:.8, z:9.1, w:.22, h:.28, label:"READ THE MEMO"},
-      {key:"note_mar", x:2.8, y:.012, z:21.6, w:.25, h:.27, label:"READ THE NOTE"}, {key:"note_elev", x:28.4, y:.012, z:22.6, w:.3, h:.2, label:"READ THE NOTE"},
+      {key:"note_mar", x:2.8, y:.012, z:21.6, w:.25, h:.27, label:"READ THE NOTE"}, {key:"note_elev", x:31.6, y:.012, z:20.6, w:.3, h:.2, label:"READ THE NOTE"},
       {key:"badge_evan", x:31.6, y:.012, z:22.9, w:.15, h:.1, label:"LOOK AT THE BADGE"}];
     for(const n of NOTES){ const m = new T.Mesh(new T.PlaneGeometry(n.w, n.h), new T.MeshStandardMaterial({map:A.tex[n.key], roughness:.85, emissive:0x30302a})); m.rotation.set(-Math.PI/2, 0, (n.x*7) % 1 - .5); m.position.set(n.x, n.y + .004, n.z); scene.add(m); n.mesh = m; }
     const nearNote = () => NOTES.find(n => Math.hypot(n.x - P.x, n.z - P.z) < 1.3);
     function showNote(n){ paused = true; n.read = true; AU.click(); const ov = document.createElement("div");
       ov.style.cssText = "position:fixed;inset:0;z-index:9993;background:rgba(0,0,0,.88);display:grid;place-items:center;padding:20px;touch-action:none";
-      ov.innerHTML = `<img src="${F9.base + n.key}.jpg" style="max-width:min(92vw,900px);max-height:78vh;box-shadow:0 0 60px #000;filter:contrast(1.05) brightness(.92)"><div style="position:absolute;bottom:calc(22px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#cfc6c0;font:600 13px var(--mono);letter-spacing:.1em">TAP TO PUT IT DOWN</div>`;
-      document.body.appendChild(ov); const close = e => { e.preventDefault(); ov.remove(); paused = false; last = performance.now(); lookDX = lookDY = 0; }; setTimeout(() => { ov.addEventListener("pointerdown", close); }, 350); }
+      ov.innerHTML = `<img src="${F9.base + n.key}.jpg" style="max-width:min(92vw,900px);max-height:78vh;box-shadow:0 0 60px #000;filter:contrast(1.05) brightness(.92)"><div style="position:absolute;bottom:calc(22px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#cfc6c0;font:600 13px var(--mono);letter-spacing:.1em">TAP${touch ? "" : " OR PRESS E"} TO PUT IT DOWN</div>`;
+      document.body.appendChild(ov); let closed = false; const close = e => { if(closed) return; closed = true; e && e.preventDefault && e.preventDefault(); ov.remove(); removeEventListener("keydown", kclose); paused = false; last = performance.now(); lookDX = lookDY = 0; };
+      const kclose = e => { if(["e","enter","escape"," "].includes(e.key.toLowerCase())){ e.stopImmediatePropagation(); close(e); } };
+      setTimeout(() => { ov.addEventListener("pointerdown", close); addEventListener("keydown", kclose, true); }, 350); }
     function flashScreen(name, ms){ const ov = document.createElement("div"); ov.style.cssText = `position:fixed;inset:0;z-index:9992;background:#000 url(${F9.base + name}.jpg) center/cover no-repeat;pointer-events:none`; document.body.appendChild(ov); setTimeout(() => ov.remove(), ms); }
 
     /* ---------- player and story state ---------- */
@@ -2746,21 +2748,23 @@ function floorOne(){
       if(!hasCard && marisolAt && Math.hypot(marisolAt.x - P.x, marisolAt.z - P.z) < 3.0) return "TAKE HER BADGE";
       if(breaker && hasCard && !powered && Math.hypot(breaker.x - P.x, breaker.z - P.z) < 2.0) return "FLIP THE BREAKER";
       if(Math.hypot(ex - 1 - P.x, ez - P.z) < 2.4 && !scripted.elevOpen && !scripted.elevCalled) return "CALL THE ELEVATOR";
-      { const n = nearNote(); if(n) return n.label; }
       const it = nearItem(); if(it) return it.kind === "battery" ? "TAKE THE BATTERY" : `PICK UP THE ${it.kind.toUpperCase()}`;
       const dr = nearDoor(); if(dr) return dr.target ? "CLOSE THE DOOR" : "OPEN THE DOOR";
+      { const n = nearNote(); if(n) return n.label; }
+      if(Math.hypot(2.4 - P.x, 27 - P.z) < 1.6) return "TRY THE STAIRS";
       if(nearLocker()) return "HIDE IN THE LOCKER";
       if(nearDesk()) return "HIDE UNDER THE DESK";
       return null; };
     const seenHiding = () => { const d = Math.hypot(C.x - P.x, C.z - P.z); return (C.mode === "hunt" || C.mode === "check") && d < 7 && los(C.x, C.z, P.x, P.z) && C.grace <= 0; };   // only if it is chasing you and close
     async function action(){
       const c = context(); if(!c) return; AU.click();
-      if(c === "HIDE UNDER THE DESK"){ const d = nearDesk(); C.sawHide = seenHiding(); P.hidden = {kind:"desk", d}; P.px = P.x; P.pz = P.z; P.x = d.x + (P.x - d.x)*.25; P.z = d.z + (P.z - d.z)*.25; fl = false; if(btnLight) btnLight.classList.remove("on"); P.breath = 1;
+      if(c === "HIDE UNDER THE DESK"){ const d = nearDesk(); C.sawHide = seenHiding(); P.hidden = {kind:"desk", d}; P.px = P.x; P.pz = P.z; P.x = d.x; P.z = d.z + .18; P.yaw = P.tyaw = Math.PI; P.pitch = P.tpitch = 0;   // tucked in, looking out from under it fl = false; if(btnLight) btnLight.classList.remove("on"); P.breath = 1;
         say(C.sawHide ? "It saw you get under there. Get out and run." : "Hidden. If it didn't see you, it can't find you.", 3, "n"); return; }
       if(c === "HIDE IN THE LOCKER"){ const l = nearLocker(); C.sawHide = seenHiding(); P.hidden = {kind:"locker", l}; P.px = P.x; P.pz = P.z; P.x = l.x + l.face*.12; P.z = l.z; P.lockYaw = l.face > 0 ? -Math.PI/2 : Math.PI/2; P.tyaw = P.yaw = P.lockYaw; P.pitch = P.tpitch = 0;
         fl = false; if(btnLight) btnLight.classList.remove("on"); P.breath = 1; AU.creak(); say(C.sawHide ? "It saw you get in. Get out and run." : "Hidden. If it didn't see you, it can't find you.", 3, "n"); return; }
       if(c === "LEAVE THE DESK" || c === "LEAVE THE LOCKER"){ if(P.hidden.kind === "locker") AU.creak(); P.x = P.px; P.z = P.pz; P.hidden = null; C.sawHide = false; return; }
       if(c === "TAKE HER BADGE") return takeCard();
+      if(c === "TRY THE STAIRS"){ AU.knock(0, 3, true); say("Locked. Something on the other side pushes back. Then three slow knocks.", 4, "n"); return; }
       if(c.startsWith("READ THE") || c === "LOOK AT THE BADGE") return showNote(nearNote());
       if(c === "TAKE THE BATTERY"){ const it = nearItem(); it.state = "gone"; it.mesh.visible = false; P.bat = Math.min(1, P.bat + .6); scripted.batDead = false; AU.chord(); say("A battery. The flashlight is brighter.", 2.5, "n"); return; }
       if(c.startsWith("PICK UP")){ const it = nearItem(); it.state = "held"; P.held = it; camera.add(it.mesh); it.mesh.position.set(-.27, -.3, -.62); it.mesh.rotation.set(.25, 0, .15); it.mesh.scale.setScalar(.75);
@@ -3076,7 +3080,7 @@ function floorOne(){
       c.fillStyle = P.bat < .25 ? "#ff5e7a" : "#cfc6c0"; c.fillText("LIGHT", 20, 63); c.fillStyle = "rgba(255,255,255,.15)"; c.fillRect(62, 55, 94, 8); c.fillStyle = P.bat < .25 ? "#ff2d55" : "#e9d79a"; c.fillRect(62, 55, 94*P.bat, 8);
       if(P.held){ c.fillStyle = "rgba(0,0,0,.5)"; c.fillRect(14, 72, 200, 18); c.fillStyle = "#ffe9a8"; c.fillText(`HOLDING: ${P.held.kind.toUpperCase()}${touch ? "" : "  (R to throw)"}`, 20, 85); }
       if(P.stamina < .98){ c.fillStyle = "rgba(255,255,255,.12)"; c.fillRect(W/2 - 60, H - 14, 120, 4); c.fillStyle = "rgba(255,255,255,.55)"; c.fillRect(W/2 - 60, H - 14, 120*P.stamina, 4); }
-      if(P.hidden){ c.fillStyle = "rgba(255,45,85,.25)"; c.fillRect(W/2 - 100, H - 130, 200, 6); c.fillStyle = "#ff2d55"; c.fillRect(W/2 - 100, H - 130, 200*P.breath, 6);
+      if(P.hidden && (P.holding || P.breath < 1 || btnBreath.style.display === "block")){ c.fillStyle = "rgba(255,45,85,.25)"; c.fillRect(W/2 - 100, H - 130, 200, 6); c.fillStyle = "#ff2d55"; c.fillRect(W/2 - 100, H - 130, 200*P.breath, 6);
         c.textAlign = "center"; c.fillStyle = "#ffd2d8"; c.font = "600 12px ui-monospace,monospace"; c.fillText(touch ? "BREATH" : "BREATH — hold SPACE when it's close", W/2, H - 138); }
       if(CS && CS.phase === "pull"){ c.textAlign = "center"; c.fillStyle = "#ffd2d8"; c.font = "600 15px ui-monospace,monospace";
         c.fillText(touch ? "PRESS AND HOLD ANYWHERE TO PULL THE CARD" : "HOLD THE MOUSE BUTTON (OR SPACE) TO PULL THE CARD", W/2, H - 52);
@@ -3112,7 +3116,7 @@ async function sectionOne(){
     ["sys","it's in here with you. it sees light and it hears running. you'll hear it before you see it."],
     ["it","GOOD MORNING, {first}. IT IS NOT MORNING."]], {end:"none"});
   if(!live()) return;
-  await floorOne(); if(!live()) return;
+  const finished = await floorOne(); if(!finished) return;    // floorOne starts its own layer, so its result is the signal, not live()
   render(`<div class="wrap" style="min-height:80vh;display:grid;place-content:center;text-align:center;font-family:var(--mono);color:#cfd8d0;gap:14px">
     <div style="color:#7dffb0;letter-spacing:.2em">SECTION 1 COMPLETE</div><div style="color:#8a8f88">the elevator is going down. the next section isn't built yet.</div>
     <div style="color:#6a605c;font-size:12px">letters kept: ${trueName().replace(/\W/g,"").length - TAKEN.letters.length} · ${esc(fullName())}</div>
